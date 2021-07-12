@@ -41,7 +41,10 @@ args = parser.parse_args()
 g = nk.graph.Chain(length=args.L, pbc=True)
 
 # Hilbert space of spins on the graph
-hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
+if args.ansatz == 'ar-qgps':
+    hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
+else:
+    hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
 
 # Heisenberg spin hamiltonian
 ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=args.msr)
@@ -54,7 +57,7 @@ elif args.dtype == 'complex':
 if args.ansatz == 'qgps':
     ma = QGPS(N=args.N, dtype=dtype)
 elif args.ansatz == 'ar-qgps':
-    ma = ARQGPS(N=args.N, L=args.L, dtype=dtype)
+    ma = ARQGPS(hilbert=hi, N=args.N, L=args.L, dtype=dtype)
 elif args.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=4,
