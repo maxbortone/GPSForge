@@ -3,6 +3,7 @@ import argparse
 import netket as nk
 import scipy
 import jax.numpy as jnp
+import mpi4py.MPI as mpi
 from qgps import QGPS
 from arqgps import ARQGPS
 from utils import dir_path
@@ -78,7 +79,7 @@ elif args.ansatz == 'rbm-symm':
 if args.ansatz == 'ar-qgps':
     sa = nk.sampler.ARDirectSampler(hi)
 else:
-    sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains=args.chains)
+    sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=args.chains)
 
 # Optimizer
 op = nk.optimizer.Sgd(learning_rate=args.lr)
@@ -93,9 +94,10 @@ vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
 # Print parameter structure
 msr_status = 'on' if args.msr else 'off'
-print(f"Running optimisation of {args.ansatz} with N={args.N}")
-print(f"- # {args.dtype} variational parameters: {vs.n_parameters}")
-print(f"- MSR: {msr_status}")
+if mpi.COMM_WORLD.Get_rank() == 0:
+    print(f"Running optimisation of {args.ansatz} with N={args.N}")
+    print(f"- # {args.dtype} variational parameters: {vs.n_parameters}")
+    print(f"- MSR: {msr_status}")
 
 # Run the optimization for 300 iterations
 if args.save:
@@ -103,9 +105,11 @@ if args.save:
     vmc.run(n_iter=args.iterations, out=path)
 else:
     for it in vmc.iter(args.iterations, 10):
-        print(it, vmc.energy)
+        if mpi.COMM_WORLD.Get_rank() == 0:
+            print(it, vmc.energy)
 
 exact_ens = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)
-print(f"Estimated energy is: {vmc.energy.mean}")
-print(f"Exact energy is: {exact_ens[0]}")
-print(f"Relative error is: {abs((vmc.energy.mean-exact_ens[0])/exact_ens[0])}")
+if mpi.COMM_WORLD.Get_rank() == 0:
+    print(f"Estimated energy is: {vmc.energy.mean}")
+    print(f"Exact energy is: {exact_ens[0]}")
+    print(f"Relative error is: {abs((vmc.energy.mean-exact_ens[0])/exact_ens[0])}")
