@@ -2,8 +2,10 @@ import os
 import argparse
 import netket as nk
 import scipy
+import numpy as np
 import jax.numpy as jnp
 import mpi4py.MPI as mpi
+import pandas as pd
 from qgps import QGPS
 from arqgps import ARQGPS
 from utils import dir_path
@@ -108,8 +110,13 @@ else:
         if mpi.COMM_WORLD.Get_rank() == 0:
             print(it, vmc.energy)
 
-exact_ens = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)
+# Get exact energy
+df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
+if (df['L']==args.L).any():
+    exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
+else:
+    exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
 if mpi.COMM_WORLD.Get_rank() == 0:
     print(f"Estimated energy is: {vmc.energy.mean}")
-    print(f"Exact energy is: {exact_ens[0]}")
-    print(f"Relative error is: {abs((vmc.energy.mean-exact_ens[0])/exact_ens[0])}")
+    print(f"Exact energy is: {exact_energy}")
+    print(f"Relative error is: {abs((vmc.energy.mean-exact_energy)/exact_energy)}")
