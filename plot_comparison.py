@@ -1,7 +1,6 @@
 import os
 import glob
 import json
-import re
 import argparse
 import numpy as np
 import pandas as pd
@@ -68,12 +67,22 @@ print(estimates)
 df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
 exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 
+# Get estimated energies and errors
+qgps_ns = np.array(list(estimates['qgps'].keys()))
+qgps_energies = [value[0] for value in estimates['qgps'].values()]
+qgps_errors = [value[1] for value in estimates['qgps'].values()]
+ar_qgps_ns = np.array(list(estimates['ar-qgps'].keys()))
+ar_qgps_energies = [value[0] for value in estimates['ar-qgps'].values()]
+ar_qgps_errors = [value[1] for value in estimates['ar-qgps'].values()]
+
+# Compute relative error per site
+qgps_rel_errors = np.abs((qgps_energies-exact_energy)/exact_energy)/args.L
+ar_qgps_rel_errors = np.abs((ar_qgps_energies-exact_energy)/exact_energy)/args.L
+
 # Plot
 fig, ax = plt.subplots()
-ax.errorbar(estimates['qgps'].keys(), [value[0] for value in estimates['qgps'].values()],
-            yerr=[value[1] for value in estimates['qgps'].values()], label='QGPS')
-ax.errorbar(estimates['ar-qgps'].keys(), [value[0] for value in estimates['ar-qgps'].values()],
-            yerr=[value[1] for value in estimates['qgps'].values()], label='AR-QGPS')
+ax.errorbar(qgps_ns, qgps_energies, yerr=qgps_errors, label='QGPS')
+ax.errorbar(ar_qgps_ns, ar_qgps_energies, yerr=ar_qgps_errors, label='AR-QGPS')
 ax.axhline(exact_energy, linestyle='dashed', color='k', label='Exact')
 ax.grid(True)
 ax.legend(loc='best')
@@ -82,5 +91,18 @@ ax.set_ylabel('Energy')
 if args.title:
     ax.set_title(args.title)
 if args.save:
-    plt.savefig(os.path.join(args.save, f"comparison_L{args.L}_N{args.N[0]}-{args.N[-1]}_{args.dtype}.png"))
+    plt.savefig(os.path.join(args.save, f"energy_L{args.L}_N{args.N[0]}-{args.N[-1]}_{args.dtype}.png"))
+
+fig, ax = plt.subplots()
+ax.plot(qgps_ns, qgps_rel_errors, marker='o', label='QGPS')
+ax.plot(ar_qgps_ns, ar_qgps_rel_errors, marker='o', label='AR-QGPS')
+ax.set_yscale('log')
+ax.grid(True)
+ax.legend(loc='best')
+ax.set_xlabel('N')
+ax.set_ylabel('Rel. error (per site)')
+if args.title:
+    ax.set_title(args.title)
+if args.save:
+    plt.savefig(os.path.join(args.save, f"rel_error_L{args.L}_N{args.N[0]}-{args.N[-1]}_{args.dtype}.png"))
 plt.show()
