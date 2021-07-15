@@ -34,8 +34,12 @@ parser.add_argument('--lr', type=float, default=0.01,
     help='Learning rate of SGD (default: 0.01)')
 parser.add_argument('--ds', type=float, default=0.1,
     help='Diagonal shift of SR (default: 0.1)')
-parser.add_argument('--msr', default=True, action=argparse.BooleanOptionalAction,
-    help='Turn on the Marshal Sign rule (default: True')
+msr_parser = parser.add_mutually_exclusive_group(required=False)
+msr_parser.add_argument('--msr', dest='msr', action='store_true',
+    help='Turns on the Marshal Sign rule')
+msr_parser.add_argument('--no-msr', dest='msr', action='store_false',
+    help='Turns off the Marshal Sign rule')
+parser.set_defaults(msr=True)
 parser.add_argument('--save', type=dir_path,
     help='Save result to path')
 args = parser.parse_args()
