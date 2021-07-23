@@ -1,4 +1,5 @@
 from typing import Tuple
+import jax
 import jax.numpy as jnp
 from jax import vmap
 from jax.scipy.special import logsumexp
@@ -21,7 +22,7 @@ class ARQGPS(ARNN):
 
     N: jnp.integer = 1
     L: jnp.integer = 1
-    dtype: DType = jnp.float64
+    dtype: DType = jnp.float32
     eps_init: NNInitFunc = gaussian()
 
     def conditionals(self, inputs: Array, cache: PyTree) -> Tuple[Array, PyTree]:
@@ -48,9 +49,10 @@ def _conditionals(model, inputs):
     def _compute_conditional_log_psi(eps, input):
         idx = jnp.expand_dims(local_states_to_indices(model.hilbert, input), axis=(0,1))
         vals = jnp.take_along_axis(eps, idx, axis=0)
-        vals = jnp.pad(vals[:,:,:-1], ((0,0),(0,0),(1,0)), constant_values=1.0)
+        vals = jax.lax.slice_in_dim(vals, 0, model.L-1, axis=2)
+        vals = jnp.pad(vals, ((0,0),(0,0),(1,0)), constant_values=1.0)
         vals = jnp.cumprod(vals, axis=-1)
-        log_conds = jnp.sum(eps*vals, axis=1).T
+        log_conds = jnp.sum(jax.lax.mul(eps, vals), axis=1).T
         return log_conds # (L, 2)
     
     log_psi = vmap(_compute_conditional_log_psi, in_axes=(None, 0))(model.eps, inputs)
