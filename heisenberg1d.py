@@ -58,7 +58,7 @@ ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=args.msr)
 
 # Ansatz machine
 if args.dtype == 'real':
-    dtype = jnp.float64
+    dtype = jnp.float32
 elif args.dtype == 'complex':
     dtype = jnp.complex64
 if args.ansatz == 'qgps':
@@ -115,7 +115,7 @@ else:
             print(it, vmc.energy)
 
 # Get exact energy
-df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
+df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
 if (df['L']==args.L).any():
     exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 else:

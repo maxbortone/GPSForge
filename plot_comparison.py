@@ -64,7 +64,7 @@ estimates = {
 print(estimates)
 
 # Get exact energy
-df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
+df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
 exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 
 # Get estimated energies and errors

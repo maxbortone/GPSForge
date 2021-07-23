@@ -9,7 +9,7 @@ from layers import BatchedFixedLayer, BatchedVariationalLayer
 class QGPS(nn.Module):
 
     N: jnp.integer = 1
-    dtype: DType = jnp.float64
+    dtype: DType = jnp.float32
     eps_init: NNInitFunc = gaussian()
 
     @nn.compact

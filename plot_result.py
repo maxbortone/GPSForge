@@ -49,7 +49,7 @@ result_path = os.path.join(args.path, f"heisenberg1d_L{args.L}_N{args.N}_{args.a
 energies, errors = unpack_result(result_path)
 
 # Get exact energy
-df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
+df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
 exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 
 # Compute relative error
