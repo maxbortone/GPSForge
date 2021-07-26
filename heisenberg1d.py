@@ -108,16 +108,21 @@ if mpi.COMM_WORLD.Get_rank() == 0:
     print(f"- # {args.dtype} variational parameters: {vs.n_parameters}")
     print(f"- MSR: {msr_status}")
 
-# Run the optimization for 300 iterations
+# Run the optimization
 if args.save:
     path = os.path.join(args.save, f"heisenberg1d_L{args.L}_N{args.N}_{args.ansatz}_{args.dtype}")
     vmc.run(n_iter=args.iterations, out=path)
 else:
     if mpi.COMM_WORLD.Get_rank() == 0:
-        print("Iteration\t Energy statistics")
+        print("Iteration\t Energy statistics\t Gradient norm")
     for it in vmc.iter(args.iterations, 10):
         if mpi.COMM_WORLD.Get_rank() == 0:
-            print(f"{it+10}/{args.iterations}: {vmc.energy}")
+            print(f"[{it+10}/{args.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
+
+# Get converged energy estimate
+# TODO: devise a better way of obtaining this,
+# as now it considers the last energy as the converged one
+estimated_energy = vs.expect(ha)
 
 # Get exact energy
 df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
@@ -126,6 +131,6 @@ if (df['L']==args.L).any():
 else:
     exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
 if mpi.COMM_WORLD.Get_rank() == 0:
-    print(f"Estimated energy is: {vmc.energy.mean}")
+    print(f"Estimated energy is: {estimated_energy}")
     print(f"Exact energy is: {exact_energy}")
-    print(f"Relative error is: {abs((vmc.energy.mean-exact_energy)/exact_energy)}")
+    print(f"Relative error is: {abs((estimated_energy.mean-exact_energy)/exact_energy)}")
