@@ -7,7 +7,8 @@ import jax.numpy as jnp
 import mpi4py.MPI as mpi
 import pandas as pd
 from qgps import QGPS
-from arqgps import ARQGPS
+from arqgps import ARQGPS, FastARQGPS
+from autoreg import ARDirectSampler
 from utils import dir_path
 
 
@@ -18,7 +19,7 @@ parser.add_argument('-L', type=int, default=4,
     help='Number of sites in the system (default: 4)')
 parser.add_argument('-N', type=int, default=1,
     help='Bond dimension of the QGPS Ansatz (default: 1)')
-parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'ar-qgps', 'rbm', 'rbm-symm'],
+parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'rbm', 'rbm-symm'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
@@ -48,7 +49,7 @@ args = parser.parse_args()
 g = nk.graph.Chain(length=args.L, pbc=True)
 
 # Hilbert space of spins on the graph
-if args.ansatz == 'ar-qgps':
+if args.ansatz in ['arqgps', 'arqgps-fast']:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
 else:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
@@ -58,13 +59,15 @@ ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=args.msr)
 
 # Ansatz machine
 if args.dtype == 'real':
-    dtype = jnp.float32
+    dtype = jnp.float64
 elif args.dtype == 'complex':
     dtype = jnp.complex64
 if args.ansatz == 'qgps':
     ma = QGPS(N=args.N, dtype=dtype)
-elif args.ansatz == 'ar-qgps':
+elif args.ansatz == 'arqgps':
     ma = ARQGPS(hilbert=hi, N=args.N, L=args.L, dtype=dtype)
+elif args.ansatz == 'arqgps-fast':
+    ma = FastARQGPS(hilbert=hi, N=args.N, L=args.L, B=args.samples, dtype=dtype)
 elif args.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=4,
@@ -82,8 +85,8 @@ elif args.ansatz == 'rbm-symm':
     )
 
 # Metropolis Local Sampling
-if args.ansatz == 'ar-qgps':
-    sa = nk.sampler.ARDirectSampler(hi)
+if args.ansatz in ['arqgps', 'arqgps-fast']:
+    sa = ARDirectSampler(hi, n_chains_per_rank=args.samples)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=args.chains)
 
@@ -92,7 +95,7 @@ op = nk.optimizer.Sgd(learning_rate=args.lr)
 sr = nk.optimizer.SR(diag_shift=args.ds)
 
 # Variational Monte Carlo driver
-if args.ansatz == 'ar-qgps':
+if args.ansatz in ['arqgps', 'arqgps-fast']:
     vs = nk.vqs.MCState(sa, ma, n_samples=args.samples)
 else:
     vs = nk.vqs.MCState(sa, ma, n_samples=args.samples, n_discard_per_chain=args.discard)
@@ -110,9 +113,11 @@ if args.save:
     path = os.path.join(args.save, f"heisenberg1d_L{args.L}_N{args.N}_{args.ansatz}_{args.dtype}")
     vmc.run(n_iter=args.iterations, out=path)
 else:
+    if mpi.COMM_WORLD.Get_rank() == 0:
+        print("Iteration\t Energy statistics")
     for it in vmc.iter(args.iterations, 10):
         if mpi.COMM_WORLD.Get_rank() == 0:
-            print(it, vmc.energy)
+            print(f"{it+10}/{args.iterations}: {vmc.energy}")
 
 # Get exact energy
 df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
