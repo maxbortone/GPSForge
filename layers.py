@@ -1,4 +1,3 @@
-import numpy as np
 import flax.linen as nn
 import jax.numpy as jnp
 from jax import lax
@@ -10,7 +9,7 @@ class FixedLayer(nn.Module):
 
     features: int
     kernel_init: NNInitFunc
-    dtype: DType = jnp.float32
+    dtype: DType = jnp.float64
     precision: Any = None
 
     @nn.compact
@@ -32,7 +31,7 @@ class VariationalLayer(nn.Module):
 
     bond_dim: int
     kernel_init: NNInitFunc
-    dtype: DType = jnp.float32
+    dtype: DType = jnp.float64
     precision: Any = None
 
     @nn.compact
