@@ -36,12 +36,14 @@ def unpack_result(path):
     with open(path, "r") as f:
         result = json.load(f)
     if args.dtype == 'real':
-        energies = np.array(result['Energy']['Mean'])
+        energies = np.array(result['Energy']['Mean'], dtype=np.float64)
     elif args.dtype == 'complex':
-        energies_re = np.array(result['Energy']['Mean']['real'])
-        energies_im = np.array(result['Energy']['Mean']['imag'])
+        energies_re = np.array(result['Energy']['Mean']['real'], dtype=np.float64)
+        energies_im = np.array(result['Energy']['Mean']['imag'], dtype=np.float64)
         energies = energies_re+1j*energies_im
-    errors = np.array(result['Energy']['Sigma'])
+    errors = np.array(result['Energy']['Sigma'], dtype=np.float64)
+    energies = np.nan_to_num(energies)
+    errors = np.nan_to_num(errors)
     return energies, errors
 
 # Extract energies and errors
@@ -49,7 +51,7 @@ result_path = os.path.join(args.path, f"heisenberg1d_L{args.L}_N{args.N}_{args.a
 energies, errors = unpack_result(result_path)
 
 # Get exact energy
-df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
+df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float64})
 exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 
 # Compute relative error
