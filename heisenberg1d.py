@@ -35,12 +35,20 @@ parser.add_argument('--lr', type=float, default=0.01,
     help='Learning rate of SGD (default: 0.01)')
 parser.add_argument('--ds', type=float, default=0.1,
     help='Diagonal shift of SR (default: 0.1)')
+parser.add_argument('--compare-to-ed', action='store_true',
+    help='Compare energy estimate to exact diagonalisation result')
 msr_parser = parser.add_mutually_exclusive_group(required=False)
 msr_parser.add_argument('--msr', dest='msr', action='store_true',
     help='Turns on the Marshal Sign rule')
 msr_parser.add_argument('--no-msr', dest='msr', action='store_false',
     help='Turns off the Marshal Sign rule')
 parser.set_defaults(msr=True)
+progress_parser = parser.add_mutually_exclusive_group(required=False)
+progress_parser.add_argument('--show-progress', dest='progress', action='store_true',
+    help='Shows the progress bar')
+progress_parser.add_argument('--hide-progress', dest='progress', action='store_false',
+    help='Hides the progress bar')
+parser.set_defaults(progress=True)
 parser.add_argument('--save', type=dir_path,
     help='Save result to path')
 args = parser.parse_args()
@@ -111,7 +119,7 @@ if mpi.COMM_WORLD.Get_rank() == 0:
 # Run the optimization
 if args.save:
     path = os.path.join(args.save, f"heisenberg1d_L{args.L}_N{args.N}_{args.ansatz}_{args.dtype}")
-    vmc.run(n_iter=args.iterations, out=path)
+    vmc.run(n_iter=args.iterations, out=path, show_progress=args.progress)
 else:
     if mpi.COMM_WORLD.Get_rank() == 0:
         print("Iteration\t Energy statistics\t Gradient norm")
@@ -119,20 +127,21 @@ else:
         if mpi.COMM_WORLD.Get_rank() == 0:
             print(f"[{it+10}/{args.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
 
-# Get converged energy estimate
-# TODO: devise a better way of obtaining this,
-# as now it considers the last energy as the converged one
-estimated_energy = vs.expect(ha)
+if args.compare_to_ed:
+    # Get converged energy estimate
+    # TODO: devise a better way of obtaining this,
+    # as now it considers the last energy as the converged one
+    estimated_energy = vs.expect(ha)
 
-# Get exact energy
-base_path = os.path.dirname(os.path.abspath(__file__))
-path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
-df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float32})
-if (df['L']==args.L).any():
-    exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
-else:
-    exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
-if mpi.COMM_WORLD.Get_rank() == 0:
-    print(f"Estimated energy is: {estimated_energy}")
-    print(f"Exact energy is: {exact_energy}")
-    print(f"Relative error is: {abs((estimated_energy.mean-exact_energy)/exact_energy)}")
+    # Get exact energy
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
+    df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float32})
+    if (df['L']==args.L).any():
+        exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
+    else:
+        exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
+    if mpi.COMM_WORLD.Get_rank() == 0:
+        print(f"Estimated energy is: {estimated_energy}")
+        print(f"Exact energy is: {exact_energy}")
+        print(f"Relative error is: {abs((estimated_energy.mean-exact_energy)/exact_energy)}")
