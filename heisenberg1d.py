@@ -125,7 +125,9 @@ else:
 estimated_energy = vs.expect(ha)
 
 # Get exact energy
-df = pd.read_csv('result_DMRG_Heisenberg_1D.csv', dtype={'L': np.int64, 'E': np.float32})
+base_path = os.path.dirname(os.path.abspath(__file__))
+path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
+df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float32})
 if (df['L']==args.L).any():
     exact_energy = 4*df.loc[df['L']==args.L]['E'].values[0]
 else:
