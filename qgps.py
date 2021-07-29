@@ -10,7 +10,7 @@ class QGPS(nn.Module):
 
     N: jnp.integer = 1
     dtype: DType = jnp.float64
-    eps_init: NNInitFunc = gaussian()
+    eps_init: NNInitFunc = gaussian(scale=0.0)
 
     @nn.compact
     def __call__(self, inputs: Array):

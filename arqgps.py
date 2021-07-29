@@ -22,7 +22,7 @@ class ARQGPS(ARNN):
     N: jnp.integer = 1
     L: jnp.integer = 1
     dtype: DType = jnp.float64
-    eps_init: NNInitFunc = gaussian()
+    eps_init: NNInitFunc = gaussian(scale=0.0)
 
     def _conditional(self, inputs: Array, index: int) -> Array:
         log_psi = _conditionals(self, inputs)
