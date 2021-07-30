@@ -1,0 +1,11 @@
+L: 4
+N: 1
+ansatz: qgps
+dtype: real
+samples: 1000
+discard: 100
+chains: 1
+iterations: 100
+learning-rate: 0.01
+diagonal-shift: 0.1
+save: ./results
