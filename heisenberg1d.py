@@ -4,13 +4,17 @@ import netket as nk
 import scipy
 import numpy as np
 import jax.numpy as jnp
-import mpi4py.MPI as mpi
 import pandas as pd
+from mpi4py import MPI
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS
 from autoreg import ARDirectSampler
 from utils import create_result, dir_path, save_config
 
+
+# MPI variables
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 # Parse arguments
 parser = configargparse.ArgumentParser(
@@ -116,22 +120,26 @@ vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
 # Print parameter structure
 msr_status = 'on' if config.msr else 'off'
-if mpi.COMM_WORLD.Get_rank() == 0:
+if rank == 0:
     print(f"Running optimisation of {config.ansatz} with N={config.N}")
     print(f"- # {config.dtype} variational parameters: {vs.n_parameters}")
     print(f"- MSR: {msr_status}")
 
 # Run the optimization
 if config.save:
-    path = create_result(config.save)
-    save_config(config, path)
+    if rank == 0:
+        path = create_result(config.save)
+        save_config(config, path)
+    else:
+        path = None
+    path = comm.bcast(path, root=0)
     logger = nk.logging.JsonLog(os.path.join(path, "output"))
     vmc.run(n_iter=config.iterations, out=logger, show_progress=config.progress)
 else:
-    if mpi.COMM_WORLD.Get_rank() == 0:
+    if rank == 0:
         print("Iteration\t Energy statistics\t Gradient norm")
     for it in vmc.iter(config.iterations, 10):
-        if mpi.COMM_WORLD.Get_rank() == 0:
+        if rank == 0:
             print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
 
 if config.compare_to_ed:
@@ -148,7 +156,7 @@ if config.compare_to_ed:
         exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
     else:
         exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
-    if mpi.COMM_WORLD.Get_rank() == 0:
+    if rank == 0:
         print(f"Estimated energy is: {estimated_energy}")
         print(f"Exact energy is: {exact_energy}")
         print(f"Relative error is: {abs((estimated_energy.mean-exact_energy)/exact_energy)}")
