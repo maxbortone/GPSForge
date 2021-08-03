@@ -1,24 +1,25 @@
 import os
+import glob
 import json
 import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from utils import parse_num_list, dir_path, extract_info
+from utils import parse_num_list, dir_path, read_config, unpack_result
 
 
 # Parse arguments
 parser = argparse.ArgumentParser(
-    description='Plot comparison between QGPS and AR-QGPS')
-parser.add_argument('-L', type=int, required=True,
+    description='Plot comparison between different results')
+parser.add_argument('--L', type=int, required=True,
     help='Number of sites in the system')
-parser.add_argument('-N', type=parse_num_list, required=True,
+parser.add_argument('--N', type=parse_num_list, required=True,
     help='Range of bond dimensions')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters')
-parser.add_argument('--path', type=dir_path, default='results',
-    help='Path to results')
+parser.add_argument('--paths', type=dir_path, nargs='+',
+    help='Paths to results')
 parser.add_argument('--title', type=str,
     help='Title of the plot')
 parser.add_argument('--save', type=dir_path,
@@ -28,44 +29,51 @@ args = parser.parse_args()
 # Set style
 plt.style.use('seaborn-dark')
 
+def is_result_path(path):
+    try:
+        _ = read_config(path)
+    except:
+        return False
+    else:
+        return True
 
-def select_files(args):
+def parse_paths(paths):
+    full_paths = set()
+    for path in paths:
+        if is_result_path(path):
+            full_paths.add(path)
+        else:
+            paths += glob.glob(path + '/*')
+    return full_paths
+
+def select_results(full_paths, args):
     paths = []
     ansatze = set()
-    for path in os.listdir(args.path):
-        _, extension = os.path.splitext(path)
-        if extension == ".log":
-            N, ansatz = extract_info(path)
-            if N in args.N:
-                paths.append(os.path.join(args.path, path))
-                ansatze.add(ansatz)
+    for path in full_paths:
+        config = read_config(path)
+        if (config.L == args.L) and (config.N in args.N) and (config.dtype == args.dtype):
+            paths.append(path)
+            ansatz = f"{config.ansatz}-s{config.samples}"
+            ansatze.add(ansatz)
     return paths, ansatze
-
-def unpack_result(path):
-    with open(path, "r") as f:
-        result = json.load(f)
-    if args.dtype == 'real':
-        energy = result['Energy']['Mean'][-1]
-    elif args.dtype == 'complex':
-        energy = result['Energy']['Mean']['real'][-1]
-    error = result['Energy']['Sigma'][-1]
-    if energy == None:
-        energy = 0.0
-    if error == None:
-        error = 0.0
-    return energy, error
 
 
 # Select results
-paths, ansatze = select_files(args)
-print(paths)
+full_paths = parse_paths(args.paths)
+result_paths, ansatze = select_results(full_paths, args)
 
 # Extract energy estimates
 estimates = {ansatz: {} for ansatz in ansatze}
-for path in paths:
-    N, ansatz = extract_info(path)
-    energy, error = unpack_result(path)
-    estimates[ansatz][N] = (energy, error)
+for path in result_paths:
+    config = read_config(path)
+    data = unpack_result(path)
+    energy = data['energy'][-1].real
+    error = data['sigma'][-1]
+    ansatz = f"{config.ansatz}-s{config.samples}"
+    estimates[ansatz][config.N] = (energy, error)
+
+# Sort ansatze alphabetically
+ansatze = sorted(ansatze)
 
 # Sort estimates by N
 estimates = {ansatz: dict(sorted(runs.items())) for (ansatz, runs) in estimates.items()}

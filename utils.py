@@ -39,7 +39,10 @@ def save_config(config, path):
 def read_config(path):
     if not os.path.isdir(path):
         raise ValueError("The provided config path does not esist")
-    with open(os.path.join(path, "config.yaml"), "r") as f:
+    config_path = os.path.join(path, "config.yaml")
+    if not os.path.isfile(config_path):
+        raise ValueError("No config file found")
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     config = argparse.Namespace(**config)
     return config
@@ -70,6 +73,6 @@ def unpack_result(path):
     return data
 
 def restore_model(path):
-    with open(path, 'rb') as b:
+    with open(os.path.join(path, "output.mpack"), 'rb') as b:
         variables = msgpack_restore(b.read())
     return variables
