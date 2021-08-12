@@ -26,6 +26,8 @@ parser.add_argument('--L', type=int, default=4,
     help='Number of sites in the system (default: 4)')
 parser.add_argument('--N', type=int, default=1,
     help='Bond dimension of the QGPS Ansatz (default: 1)')
+parser.add_argument('--alpha', type=int, default=1,
+    help='Feature density of the RBM Ansatz (default: 1)')
 parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'rbm', 'rbm-symm'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
@@ -87,7 +89,7 @@ elif config.ansatz == 'arqgps-fast':
     ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=config.samples, dtype=dtype)
 elif config.ansatz == 'rbm':
     ma = nk.models.RBM(
-        alpha=4,
+        alpha=config.alpha,
         use_visible_bias=False,
         use_hidden_bias=True,
         dtype=dtype,
@@ -95,7 +97,7 @@ elif config.ansatz == 'rbm':
 elif config.ansatz == 'rbm-symm':
     ma = nk.models.RBMSymm(
         symmetries=g.translation_group(),
-        alpha=4,
+        alpha=config.alpha,
         use_visible_bias=False,
         use_hidden_bias=True,
         dtype=dtype,
@@ -140,7 +142,10 @@ else:
         print("Iteration\t Energy statistics\t Gradient norm")
     for it in vmc.iter(config.iterations, 10):
         if rank == 0:
-            print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
+            if config.ansatz in ['rbm', 'rbm-symm']:
+                print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['Dense']['kernel'])}")
+            else:
+                print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
 
 if config.compare_to_ed:
     # Get converged energy estimate
