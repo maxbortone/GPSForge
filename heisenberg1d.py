@@ -6,6 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 import pandas as pd
 from mpi4py import MPI
+from initializers import gaussian
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS
 from autoreg import ARDirectSampler
@@ -28,6 +29,10 @@ parser.add_argument('--N', type=int, default=1,
     help='Bond dimension of the QGPS Ansatz (default: 1)')
 parser.add_argument('--alpha', type=int, default=1,
     help='Feature density of the RBM Ansatz (default: 1)')
+parser.add_argument('--scale', type=float, default=0.01,
+    help='Scale of the initialized QGPS Ansatz parameters (default: 0.01)')
+parser.add_argument('--maxval', type=float, default=0.1,
+    help='Max value of the phase of the initialized complex QGPS Ansatz parameters (default: 0.1)')
 parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'rbm', 'rbm-symm'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
@@ -81,12 +86,14 @@ if config.dtype == 'real':
     dtype = jnp.float64
 elif config.dtype == 'complex':
     dtype = jnp.complex64
+if config.ansatz in ['qgps', 'arqgps', 'arqgps-fast']:
+    eps_init = gaussian(scale=config.scale, maxval=config.maxval, dtype=dtype)
 if config.ansatz == 'qgps':
-    ma = QGPS(N=config.N, dtype=dtype)
+    ma = QGPS(N=config.N, eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'arqgps':
-    ma = ARQGPS(hilbert=hi, N=config.N, L=config.L, dtype=dtype)
+    ma = ARQGPS(hilbert=hi, N=config.N, L=config.L,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'arqgps-fast':
-    ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=config.samples, dtype=dtype)
+    ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=config.samples,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=config.alpha,
