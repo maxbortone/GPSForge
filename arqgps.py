@@ -1,7 +1,10 @@
+from typing import Union
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 from netket.hilbert import Spin
+from netket.utils import HashableArray
+from netket.utils.group import PermutationGroup
 from netket.utils.types import DType, Array, NNInitFunc
 from netket.models import ARNN
 from netket.nn.initializers import ones
@@ -38,6 +41,8 @@ class ARQGPS(ARNN):
         self._eps = self.param("epsilon", self.eps_init, (2, self.N, self.L), self.dtype)
 
     def __call__(self, inputs: Array):
+        if jnp.ndim(inputs) == 1:
+            inputs = jnp.expand_dims(inputs, axis=0)
         return _call(self, inputs)
 
 
@@ -64,7 +69,38 @@ class FastARQGPS(ARNN):
         return p # (B, L, 2)
 
     def __call__(self, inputs: Array) -> Array:
+        if jnp.ndim(inputs) == 1:
+            inputs = jnp.expand_dims(inputs, axis=0)
         return _call(self, inputs)
+
+
+class FastARQGPSSymm(ARNN):
+
+    symmetries: Union[HashableArray, PermutationGroup]
+    N: jnp.integer = 1
+    L: jnp.integer = 1
+    B: jnp.integer = 1
+    dtype: DType = jnp.float64
+    eps_init: NNInitFunc = gaussian(scale=0.0)
+
+    def setup(self):
+        self._eps = self.param("epsilon", self.eps_init, (2, self.N, self.L), self.dtype)
+        self._cache = self.variable("cache", "inputs", ones, None, (self.B, 2, self.N), self.dtype)
+
+    def _conditional(self, inputs: Array, index: int) -> Array:
+        log_psi = _conditional(self, inputs, index)
+        p = jnp.exp(2*log_psi.real)
+        return p # (B, 2)
+
+    def conditionals(self, inputs: Array) -> Array:
+        log_psi = _conditionals(self, inputs)
+        p = jnp.exp(2*log_psi.real)
+        return p # (B, L, 2)
+
+    def __call__(self, inputs: Array) -> Array:
+        if jnp.ndim(inputs) == 1:
+            inputs = jnp.expand_dims(inputs, axis=0)
+        return _symmetrize(self, inputs)
 
 
 def _conditional(model, inputs, index):
@@ -119,8 +155,6 @@ def _conditionals(model, inputs):
     return log_psi # (B, L, 2)
 
 def _call(model, inputs):
-    if jnp.ndim(inputs) == 1:
-        inputs = jnp.expand_dims(inputs, axis=0)
     batch_size = inputs.shape[0]
 
     # Compute log conditional probabilities
@@ -137,3 +171,14 @@ def _call(model, inputs):
     # Compute log-probability for each input configuration
     log_psi = jnp.sum(jnp.reshape(log_psi, (batch_size, -1)), axis=1)
     return log_psi # (B,)
+
+def _symmetrize(model, inputs):
+    batch_size = inputs.shape[0]
+    num_symm = model.symmetries.shape[0]
+    log_psi = jax.vmap(
+        lambda t: _call(model, jnp.take_along_axis(inputs, jnp.tile(t, (batch_size, 1)), axis=1)),
+        in_axes=0)(model.symmetries.to_array()) # (T, B)
+    log_psi_symm_real = 0.5*logsumexp(2*log_psi.real, 0, 1/num_symm) # (B,)
+    log_psi_symm_imag = logsumexp(1j*log_psi.imag, 0).imag # (B,)
+    log_psi_symm = log_psi_symm_real+1j*log_psi_symm_imag
+    return log_psi_symm # (B,)

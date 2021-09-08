@@ -8,7 +8,7 @@ import pandas as pd
 from mpi4py import MPI
 from initializers import gaussian
 from qgps import QGPS
-from arqgps import ARQGPS, FastARQGPS
+from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
 from autoreg import ARDirectSampler
 from utils import create_result, dir_path, save_config
 
@@ -33,7 +33,7 @@ parser.add_argument('--scale', type=float, default=0.01,
     help='Scale of the initialized QGPS Ansatz parameters (default: 0.01)')
 parser.add_argument('--maxval', type=float, default=0.1,
     help='Max value of the phase of the initialized complex QGPS Ansatz parameters (default: 0.1)')
-parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'rbm', 'rbm-symm'],
+parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'rbm', 'rbm-symm'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
@@ -73,7 +73,7 @@ config = parser.parse_args()
 g = nk.graph.Chain(length=config.L, pbc=True)
 
 # Hilbert space of spins on the graph
-if config.ansatz in ['arqgps', 'arqgps-fast']:
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
 else:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
@@ -86,7 +86,7 @@ if config.dtype == 'real':
     dtype = jnp.float64
 elif config.dtype == 'complex':
     dtype = jnp.complex64
-if config.ansatz in ['qgps', 'arqgps', 'arqgps-fast']:
+if config.ansatz in ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     eps_init = gaussian(scale=config.scale, maxval=config.maxval, dtype=dtype)
 if config.ansatz == 'qgps':
     ma = QGPS(N=config.N, eps_init=eps_init, dtype=dtype)
@@ -94,6 +94,8 @@ elif config.ansatz == 'arqgps':
     ma = ARQGPS(hilbert=hi, N=config.N, L=config.L,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'arqgps-fast':
     ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=config.samples,  eps_init=eps_init, dtype=dtype)
+elif config.ansatz == 'arqgps-fast-symm':
+    ma = FastARQGPSSymm(hilbert=hi, symmetries=g.automorphisms(), N=config.N, L=config.L, B=config.samples,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=config.alpha,
@@ -111,7 +113,7 @@ elif config.ansatz == 'rbm-symm':
     )
 
 # Metropolis Local Sampling
-if config.ansatz in ['arqgps', 'arqgps-fast']:
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     sa = ARDirectSampler(hi, n_chains_per_rank=config.samples)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
