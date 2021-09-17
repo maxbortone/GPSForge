@@ -112,7 +112,7 @@ elif config.ansatz == 'rbm-symm':
         dtype=dtype,
     )
 
-# Metropolis Local Sampling
+# Sampler
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     sa = ARDirectSampler(hi, n_chains_per_rank=config.samples)
 else:
@@ -132,7 +132,10 @@ vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 # Print parameter structure
 msr_status = 'on' if config.msr else 'off'
 if rank == 0:
-    print(f"Running optimisation of {config.ansatz} with N={config.N}")
+    if config.ansatz in ['rbm', 'rbm-symm']:
+        print(f"Running optimisation of {config.ansatz} with alpha={config.alpha}")
+    else:
+        print(f"Running optimisation of {config.ansatz} with N={config.N}")
     print(f"- # {config.dtype} variational parameters: {vs.n_parameters}")
     print(f"- MSR: {msr_status}")
 
