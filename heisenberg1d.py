@@ -123,7 +123,7 @@ op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
 sr = nk.optimizer.SR(diag_shift=config.diagonal_shift)
 
 # Variational Monte Carlo driver
-if config.ansatz in ['arqgps', 'arqgps-fast']:
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
 else:
     vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)

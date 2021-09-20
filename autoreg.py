@@ -77,7 +77,16 @@ class ARDirectSampler(Sampler):
         return state
 
     def _sample_chain(sampler, model, variables, state, chain_length):
-        return _sample_chain(sampler, model, variables, state, chain_length)
+        σ, new_state = _sample_chain(sampler, model, variables, state, chain_length)
+        if hasattr(model, "symmetries"):
+            # Sample symmetry transformations from uniform distribution
+            # and apply them to each configuration in the batch
+            new_key, key_symm = jax.random.split(new_state.key)
+            r = jax.random.randint(key_symm, shape=(σ.shape[0],), minval=0, maxval=model.symmetries.shape[0])
+            idx = jnp.expand_dims(model.symmetries.to_array()[r, :], axis=0)
+            σ = jnp.take_along_axis(σ, idx, axis=2)
+            new_state = new_state.replace(key=new_key)
+        return σ, new_state
 
     def _sample_next(sampler, model, variables, state):
         σ, new_state = sampler._sample_chain(model, variables, state, 1)

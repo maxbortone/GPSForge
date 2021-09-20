@@ -86,6 +86,8 @@ class FastARQGPSSymm(ARNN):
     def setup(self):
         self._eps = self.param("epsilon", self.eps_init, (2, self.N, self.L), self.dtype)
         self._cache = self.variable("cache", "inputs", ones, None, (self.B, 2, self.N), self.dtype)
+        self._symmetries = self.symmetries.to_array()
+        self.n_symm = self.symmetries.shape[0]
 
     def _conditional(self, inputs: Array, index: int) -> Array:
         log_psi = _conditional(self, inputs, index)
@@ -100,7 +102,10 @@ class FastARQGPSSymm(ARNN):
     def __call__(self, inputs: Array) -> Array:
         if jnp.ndim(inputs) == 1:
             inputs = jnp.expand_dims(inputs, axis=0)
-        return _symmetrize(self, inputs)
+        transformed_inputs = _transform(self._symmetries, inputs)
+        log_psi = jax.vmap(lambda x: _call(self, x), in_axes=0)(transformed_inputs) # (T, B)
+        log_psi_symm = _average(self.n_symm, log_psi)
+        return log_psi_symm # (B,)
 
 
 def _conditional(model, inputs, index):
@@ -172,13 +177,16 @@ def _call(model, inputs):
     log_psi = jnp.sum(jnp.reshape(log_psi, (batch_size, -1)), axis=1)
     return log_psi # (B,)
 
-def _symmetrize(model, inputs):
+@jax.jit
+def _transform(symmetries, inputs):
     batch_size = inputs.shape[0]
-    num_symm = model.symmetries.shape[0]
-    log_psi = jax.vmap(
-        lambda t: _call(model, jnp.take_along_axis(inputs, jnp.tile(t, (batch_size, 1)), axis=1)),
-        in_axes=0)(model.symmetries.to_array()) # (T, B)
+    transformed_inputs = jax.vmap(
+        lambda t: jnp.take_along_axis(inputs, jnp.tile(t, (batch_size, 1)), axis=1), in_axes=0, out_axes=0)(symmetries)
+    return transformed_inputs
+
+@jax.jit
+def _average(num_symm, log_psi):
     log_psi_symm_real = 0.5*logsumexp(2*log_psi.real, 0, 1/num_symm) # (B,)
     log_psi_symm_imag = logsumexp(1j*log_psi.imag, 0).imag # (B,)
     log_psi_symm = log_psi_symm_real+1j*log_psi_symm_imag
-    return log_psi_symm # (B,)
+    return log_psi_symm
