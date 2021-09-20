@@ -98,10 +98,10 @@ sigmaz = [[1, 0], [0, -1]]
 mszsz = (np.kron(sigmaz, sigmaz))
 exchange = np.asarray([[0, 0, 0, 0], [0, 0, 2, 0], [0, 2, 0, 0], [0, 0, 0, 0]])
 bond_operator = [
-    (msr_rot*J1*mszsz).tolist(),
-    (J2*mszsz).tolist(),
-    (msr_rot*J1*exchange).tolist(),
-    (J2*exchange).tolist(),
+    (msr_rot*(J1/4)*mszsz).tolist(),
+    ((J2/4)*mszsz).tolist(),
+    (msr_rot*(J1/4)*exchange).tolist(),
+    ((J2/4)*exchange).tolist(),
 
 ]
 bond_color = [1, 2, 1, 2]
@@ -131,7 +131,7 @@ elif config.ansatz == 'rbm':
     )
 elif config.ansatz == 'rbm-symm':
     ma = nk.models.RBMSymm(
-        symmetries=g.translation_group(),
+        symmetries=g.automorphisms(),
         alpha=config.alpha,
         use_visible_bias=False,
         use_hidden_bias=True,
@@ -192,14 +192,13 @@ if config.compare_to_ed:
     estimated_energy = vs.expect(ha)
 
     # Get exact energy
-    # base_path = os.path.dirname(os.path.abspath(__file__))
-    # path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
-    # df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float32})
-    # if (df['L']==config.L).any():
-    #     exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
-    # else:
-    #     exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
-    exact_energy = nk.exact.lanczos_ed(ha, compute_eigenvectors=False)
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
+    df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
+    if (df['L']==config.L).any():
+        exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
+    else:
+        exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
     if rank == 0:
         print(f"Estimated energy is: {estimated_energy}")
         print(f"Exact energy is: {exact_energy}")
