@@ -1,13 +1,15 @@
-L: 4
+model: heisenberg1d
+L: 20
 N: 1
 scale: 0.001
 maxval: 0.1
-ansatz: qgps
+ansatz: arqgps
 dtype: real
-samples: 1000
-discard: 100
+samples: 200
+discard: 200
 chains: 1
-iterations: 100
+iterations: 200
 learning-rate: 0.01
-diagonal-shift: 0.1
-save: ./results
+diagonal-shift: 0.01
+msr: True
+# no-msr: true

@@ -1,15 +1,17 @@
+model: j1j22d
 L: 6
 J1: 1.0
 J2: 0.2
 N: 1
 scale: 0.001
 maxval: 0.1
-ansatz: qgps
+ansatz: arqgps
 dtype: real
-samples: 2000
+samples: 200
 discard: 200
 chains: 1
 iterations: 200
 learning-rate: 0.01
 diagonal-shift: 0.01
 msr: True
+# no-msr: true
