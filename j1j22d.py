@@ -149,7 +149,7 @@ op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
 sr = nk.optimizer.SR(diag_shift=config.diagonal_shift)
 
 # Variational Monte Carlo driver
-if config.ansatz in ['arqgps', 'arqgps-fast']:
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
 else:
     vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
@@ -196,7 +196,7 @@ if config.compare_to_ed:
     path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
     df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
     if (df['L']==config.L).any():
-        exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
+        exact_energy = 4*df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
     else:
         exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
     if rank == 0:
