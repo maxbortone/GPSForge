@@ -12,6 +12,8 @@ parser = argparse.ArgumentParser(
     description='Plot result')
 parser.add_argument('--path', type=dir_path, default='results',
     help='Path to result')
+parser.add_argument('--model', default='heisenberg1d', choices=['heisenberg1d', 'j1j22d'],
+    help='Model that has been simulated (default: heisenberg1d)')
 parser.add_argument('--title', type=str,
     help='Title of the plot')
 parser.add_argument('--save', action='store_true',
@@ -33,11 +35,11 @@ iters = data['iters']
 
 # Get exact energy
 base_path = os.path.dirname(os.path.abspath(__file__))
-if config.model == "heisenberg1d":
+if args.model == "heisenberg1d":
     path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
     df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float64})
     exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
-elif config.model == "j1j22d":
+elif args.model == "j1j22d":
     path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
     df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
     exact_energy = 4*df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
