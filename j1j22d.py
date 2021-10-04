@@ -10,7 +10,7 @@ from initializers import gaussian
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
 from autoreg import ARDirectSampler
-from utils import create_result, dir_path, save_config
+from utils import create_result, dir_path, get_exact_energy, save_config
 
 
 # MPI variables
@@ -192,12 +192,8 @@ if config.compare_to_ed:
     estimated_energy = vs.expect(ha)
 
     # Get exact energy
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
-    df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
-    if (df['L']==config.L).any():
-        exact_energy = 4*df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
-    else:
+    exact_energy = get_exact_energy("j1j22d", config)
+    if exact_energy is None:
         exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
     if rank == 0:
         print(f"Estimated energy is: {estimated_energy}")

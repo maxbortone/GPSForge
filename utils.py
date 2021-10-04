@@ -5,6 +5,7 @@ import uuid
 import yaml
 import json
 import numpy as np
+import pandas as pd
 from flax.serialization import msgpack_restore
 
 
@@ -38,7 +39,7 @@ def save_config(config, path):
 
 def read_config(path):
     if not os.path.isdir(path):
-        raise ValueError("The provided config path does not esist")
+        raise ValueError("The provided config path does not exist")
     config_path = os.path.join(path, "config.yaml")
     if not os.path.isfile(config_path):
         raise ValueError("No config file found")
@@ -76,3 +77,37 @@ def restore_model(path):
     with open(os.path.join(path, "output.mpack"), 'rb') as b:
         variables = msgpack_restore(b.read())
     return variables
+
+def list_results(paths):
+    if isinstance(paths, str):
+        results = [os.path.join(paths, result) for result in os.listdir(paths)]
+    elif isinstance(paths, list):
+        results = []
+        for path in paths:
+            for result in os.listdir(path):
+                results.append(os.path.join(path, result))
+    configs = []
+    for result in results:
+        config = vars(read_config(result))
+        config['path'] = result
+        config['uuid'] = os.path.basename(result)
+        configs.append(config)
+    df = pd.DataFrame(configs)
+    df = df.sort_values(['L', 'N'])
+    df = df.reset_index(drop=True)
+    return df
+
+def get_exact_energy(model, config):
+    exact_energy = None
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    if model == "heisenberg1d":
+        path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
+        df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float64})
+        if (df['L']==config.L).any():
+            exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
+    elif model == "j1j22d":
+        path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
+        df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
+        if ((df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)).any():
+            exact_energy = df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
+    return exact_energy
