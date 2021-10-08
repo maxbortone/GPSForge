@@ -14,8 +14,9 @@ from utils import create_result, dir_path, get_exact_energy, save_config
 
 
 # MPI variables
-comm = MPI.COMM_WORLD
+comm = MPI.COMM_WORLD.Create(MPI.COMM_WORLD.Get_group())
 rank = comm.Get_rank()
+n_nodes = comm.Get_size()
 
 # Parse arguments
 parser = configargparse.ArgumentParser(
@@ -69,6 +70,11 @@ parser.add_argument('--save', type=dir_path,
 # Update config
 config = parser.parse_args()
 
+# Compute samples per rank
+if config.samples % n_nodes != 0:
+    raise ValueError("Define a number of samples that is a multiple of the number of MPI ranks")
+samples_per_rank = config.samples // n_nodes
+
 # 1D Lattice
 g = nk.graph.Chain(length=config.L, pbc=True)
 
@@ -93,9 +99,9 @@ if config.ansatz == 'qgps':
 elif config.ansatz == 'arqgps':
     ma = ARQGPS(hilbert=hi, N=config.N, L=config.L,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'arqgps-fast':
-    ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=config.samples,  eps_init=eps_init, dtype=dtype)
+    ma = FastARQGPS(hilbert=hi, N=config.N, L=config.L, B=samples_per_rank,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'arqgps-fast-symm':
-    ma = FastARQGPSSymm(hilbert=hi, symmetries=g.automorphisms(), N=config.N, L=config.L, B=config.samples,  eps_init=eps_init, dtype=dtype)
+    ma = FastARQGPSSymm(hilbert=hi, symmetries=g.automorphisms(), N=config.N, L=config.L, B=samples_per_rank,  eps_init=eps_init, dtype=dtype)
 elif config.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=config.alpha,
@@ -114,7 +120,7 @@ elif config.ansatz == 'rbm-symm':
 
 # Sampler
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-    sa = ARDirectSampler(hi, n_chains_per_rank=config.samples)
+    sa = ARDirectSampler(hi, n_chains=config.samples)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
