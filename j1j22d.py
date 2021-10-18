@@ -4,7 +4,6 @@ import netket as nk
 import scipy
 import numpy as np
 import jax.numpy as jnp
-import pandas as pd
 from mpi4py import MPI
 from initializers import gaussian
 from qgps import QGPS
@@ -50,8 +49,14 @@ parser.add_argument('--chains', type=int, default=1,
     help='Number of chains used in VMC (default: 1)')
 parser.add_argument('--iterations', type=int, default=100,
     help='Number of VMC iterations (default: 100)')
+parser.add_argument('--optimizer', default='sgd_sr', choices=['sgd', 'sgd-sr', 'adam'],
+    help='Optimizer used for learning (default: SGD)')
 parser.add_argument('--learning-rate', type=float, default=0.01,
-    help='Learning rate of SGD (default: 0.01)')
+    help='Learning rate of SGD or Adam (default: 0.01)')
+parser.add_argument('--b1', type=float, default=0.9,
+    help='Weight decay of 1st moment of Adam (default: 0.9)')
+parser.add_argument('--b2', type=float, default=0.999,
+    help='Weight decay of 2nd moment of Adam (default: 0.999)')
 parser.add_argument('--diagonal-shift', type=float, default=0.1,
     help='Diagonal shift of SR (default: 0.1)')
 parser.add_argument('--compare-to-ed', default=False, action='store_true',
@@ -151,8 +156,15 @@ else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains, d_max=2)
 
 # Optimizer
-op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
-sr = nk.optimizer.SR(diag_shift=config.diagonal_shift)
+if config.optimizer == 'sgd':
+    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
+    sr = None
+elif config.optimizer == 'sgd-sr':
+    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
+    sr = nk.optimizer.SR(diag_shift=config.diagonal_shift, iterative=config.sr_iterative)
+elif config.optimizer == 'adam':
+    op = nk.optimizer.Adam(learning_rate=config.learning_rate, b1=config.b1, b2=config.b2)
+    sr = None
 
 # Variational Monte Carlo driver
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
