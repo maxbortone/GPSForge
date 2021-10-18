@@ -59,6 +59,8 @@ parser.add_argument('--b2', type=float, default=0.999,
     help='Weight decay of 2nd moment of Adam (default: 0.999)')
 parser.add_argument('--diagonal-shift', type=float, default=0.1,
     help='Diagonal shift of SR (default: 0.1)')
+parser.add_argument('--sr-iterative', type=bool, default=True,
+    help='Whether to use an iterative method or not for SR (default: True)')
 parser.add_argument('--compare-to-ed', default=False, action='store_true',
     help='Compare energy estimate to exact diagonalisation result')
 msr_parser = parser.add_mutually_exclusive_group(required=False)
