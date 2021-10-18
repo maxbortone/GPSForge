@@ -4,13 +4,12 @@ J2: 0.2
 N: 1
 scale: 0.001
 maxval: 0.1
-ansatz: arqgps
+ansatz: arqgps-fast
 dtype: real
-samples: 200
-discard: 200
-chains: 1
-iterations: 200
+samples: 1000
+iterations: 100
+optimizer: 'sgd-sr'
 learning-rate: 0.01
 diagonal-shift: 0.01
 msr: True
-# no-msr: true
+#no-msr: True
