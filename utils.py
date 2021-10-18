@@ -54,7 +54,10 @@ def unpack_result(path):
         result = json.load(f)
     iters = np.array(result['Energy']['iters'])
     if config.dtype == 'real':
-        energy = np.array(result['Energy']['Mean'], dtype=np.float64)
+        try:
+            energy = np.array(result['Energy']['Mean'], dtype=np.float64)
+        except:
+            energy = np.array(result['Energy']['Mean']['real'], dtype=np.float64)
     elif config.dtype == 'complex':
         energy_re = np.array(result['Energy']['Mean']['real'], dtype=np.float64)
         energy_im = np.array(result['Energy']['Mean']['imag'], dtype=np.float64)
