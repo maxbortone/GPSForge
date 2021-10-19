@@ -45,7 +45,7 @@ parser.add_argument('--chains', type=int, default=1,
     help='Number of chains used in VMC (default: 1)')
 parser.add_argument('--iterations', type=int, default=100,
     help='Number of VMC iterations (default: 100)')
-parser.add_argument('--optimizer', default='sgd_sr', choices=['sgd', 'sgd-sr', 'adam'],
+parser.add_argument('--optimizer', default='sgd-sr', choices=['sgd', 'sgd-sr', 'adam'],
     help='Optimizer used for learning (default: SGD)')
 parser.add_argument('--learning-rate', type=float, default=0.01,
     help='Learning rate of SGD or Adam (default: 0.01)')
