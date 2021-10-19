@@ -16,7 +16,7 @@ from functools import partial
 
 from netket.sampler import Sampler, SamplerState
 from netket.utils import struct
-from netket.utils.types import PRNGKeyT, PyTree
+from netket.utils.types import PRNGKeyT
 
 import jax
 from jax import numpy as jnp
@@ -82,7 +82,7 @@ class ARDirectSampler(Sampler):
             # Sample symmetry transformations from uniform distribution
             # and apply them to each configuration in the batch
             new_key, key_symm = jax.random.split(new_state.key)
-            r = jax.random.randint(key_symm, shape=(σ.shape[0],), minval=0, maxval=model.symmetries.shape[0])
+            r = jax.random.randint(key_symm, shape=(sampler.n_chains_per_rank,), minval=0, maxval=model.symmetries.shape[0])
             idx = jnp.expand_dims(model.symmetries.to_array()[r, :], axis=0)
             σ = jnp.take_along_axis(σ, idx, axis=2)
             new_state = new_state.replace(key=new_key)
