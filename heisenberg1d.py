@@ -127,7 +127,7 @@ elif config.ansatz == 'rbm-symm':
 
 # Sampler
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-    sa = ARDirectSampler(hi, n_chains_per_rank=config.chains)
+    sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
