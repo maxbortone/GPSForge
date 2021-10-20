@@ -64,11 +64,12 @@ g = sns.relplot(
     x='N', y='rel_error',
     hue='ansatz', style='ansatz', size='samples',
     col='msr', row='dtype',
+    col_order=[True, False],
     markers=True, dashes=False)
 g.set(yscale='log')
 g.tight_layout()
 if g.axes.shape == (2,2):
-    g.fig.delaxes(g.axes[0,0])
+    g.fig.delaxes(g.axes[0,1])
 if args.title:
     g.set_title(args.title)
 if args.save:
