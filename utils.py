@@ -4,9 +4,12 @@ import argparse
 import uuid
 import yaml
 import json
+import jax
 import numpy as np
 import pandas as pd
 from flax.serialization import msgpack_restore
+from timeit import default_timer as timer
+from datetime import timedelta
 
 
 def dir_path(string):
@@ -42,7 +45,7 @@ def read_config(path):
         raise ValueError("The provided config path does not exist")
     config_path = os.path.join(path, "config.yaml")
     if not os.path.isfile(config_path):
-        raise ValueError("No config file found")
+        raise ValueError(f"No config file found at {path}")
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     config = argparse.Namespace(**config)
@@ -114,3 +117,14 @@ def get_exact_energy(model, config):
         if ((df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)).any():
             exact_energy = df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
     return exact_energy
+
+def time_fn(fn, *args, repetitions=1):
+    runtimes = []
+    for _ in range(repetitions):
+        start = timer()
+        output = fn(*args)
+        jax.tree_map(lambda x: x.block_until_ready(), output)
+        end = timer()
+        runtime = timedelta(seconds=end-start)
+        runtimes.append(runtime)
+    return output, np.mean(runtimes)
