@@ -1,9 +1,8 @@
 import os
 import argparse
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from utils import dir_path, read_config, unpack_result
+from utils import dir_path, get_exact_energy, read_config, unpack_result
 from pprint import pprint
 
 
@@ -34,16 +33,7 @@ sigma = data['sigma']
 iters = data['iters']
 
 # Get exact energy
-base_path = os.path.dirname(os.path.abspath(__file__))
-if args.model == "heisenberg1d":
-    path = os.path.join(base_path, 'result_DMRG_Heisenberg_1D.csv')
-    df = pd.read_csv(path, dtype={'L': np.int64, 'E': np.float64})
-    exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
-elif args.model == "j1j22d":
-    path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
-    df = pd.read_csv(path, dtype={'L': np.int64, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
-    exact_energy = 4*df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
-
+exact_energy = get_exact_energy(args.model, config)
 
 # Compute relative error
 rel_error = np.abs((energy-exact_energy)/exact_energy)
