@@ -1,21 +1,20 @@
 import argparse
-from autoreg import ARDirectSampler
 import jax
 import netket as nk
 import jax.numpy as jnp
+import numpy as np
+from mpi4py import MPI
 from qgps import FastQGPS, QGPS
-from arqgps import ARQGPS, FastARQGPS
-from timeit import default_timer as timer
-from datetime import timedelta
+from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
+from autoreg import ARDirectSampler
+from initializers import gaussian
+from utils import time_fn
 
 
-def time_fn(fn, *args):
-    start = timer()
-    output = fn(*args)
-    jax.tree_map(lambda x: x.block_until_ready(), output)
-    end = timer()
-    runtime = timedelta(seconds=end-start)
-    return output, runtime
+# MPI variables
+comm = MPI.COMM_WORLD.Create(MPI.COMM_WORLD.Get_group())
+rank = comm.Get_rank()
+n_nodes = comm.Get_size()
 
 # Parse arguments
 parser = argparse.ArgumentParser(
@@ -26,19 +25,26 @@ parser.add_argument('-N', type=int, default=1,
     help='Bond dimension of the QGPS Ansatz (default: 1)')
 parser.add_argument('--alpha', type=int, default=4,
     help='Alpha parameters of RBM Ansatz (default: 4)')
-parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'qgps-fast', 'arqgps', 'arqgps-fast', 'rbm', 'rbm-symm', 'mps'],
+parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'qgps-fast', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'rbm', 'rbm-symm', 'mps'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
 parser.add_argument('--samples', type=int, default=1000,
     help='Number of samples used in VMC (default: 1000)')
+parser.add_argument('--repetitions', type=int, default=1,
+    help='Number of times the function is executed to compute a runtime (default: 1)')
 args = parser.parse_args()
+
+# Compute samples per rank
+if args.samples % n_nodes != 0:
+    raise ValueError("Define a number of samples that is a multiple of the number of MPI ranks")
+samples_per_rank = args.samples // n_nodes
 
 # 1D Lattice
 g = nk.graph.Chain(length=args.L, pbc=True)
 
 # Hilbert space of spins on the graph
-if args.ansatz in ['arqgps', 'arqgps-fast']:
+if args.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
 else:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
@@ -48,9 +54,11 @@ ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=False)
 
 # Ansatz machine
 if args.dtype == 'real':
-    dtype = jnp.float32
+    dtype = jnp.float64
 elif args.dtype == 'complex':
     dtype = jnp.complex64
+if args.ansatz in ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+    eps_init = gaussian(scale=0.001, maxval=0.1, dtype=dtype)
 if args.ansatz == 'qgps':
     ma = QGPS(N=args.N, dtype=dtype)
 elif args.ansatz == 'qgps-fast':
@@ -58,7 +66,9 @@ elif args.ansatz == 'qgps-fast':
 elif args.ansatz == 'arqgps':
     ma = ARQGPS(hilbert=hi, N=args.N, L=args.L, dtype=dtype)
 elif args.ansatz == 'arqgps-fast':
-    ma = FastARQGPS(hilbert=hi, N=args.N, L=args.L, B=args.samples, dtype=dtype)
+    ma = FastARQGPS(hilbert=hi, N=args.N, L=args.L, B=samples_per_rank, dtype=dtype)
+elif args.ansatz == 'arqgps-fast-symm':
+    ma = FastARQGPSSymm(hilbert=hi, symmetries=g.automorphisms(), N=args.N, L=args.L, B=samples_per_rank,  eps_init=eps_init, dtype=dtype)
 elif args.ansatz == 'rbm':
     ma = nk.models.RBM(
         alpha=args.alpha,
@@ -83,8 +93,8 @@ elif args.ansatz == 'mps':
     )
 
 # Sampler
-if args.ansatz in ['arqgps', 'arqgps-fast']:
-    sa = ARDirectSampler(hi, n_chains_per_rank=args.samples)
+if args.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+    sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=1)
 
@@ -93,42 +103,43 @@ op = nk.optimizer.Sgd(learning_rate=0.01)
 sr = nk.optimizer.SR(diag_shift=0.01)
 
 # VMC state
-if args.ansatz in ['arqgps', 'arqgps-fast']:
+if args.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     vs = nk.vqs.MCState(sa, ma, n_samples=args.samples)
 else:
     vs = nk.vqs.MCState(sa, ma, n_samples=args.samples, n_discard_per_chain=int(args.samples/10))
 vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
-
 # Setup model
-key = jax.random.PRNGKey(42)
-x = jax.random.choice(key, jnp.array([-1, 1]), (1, args.L,))
-params = ma.init(key, x)
-n_params = nk.jax.tree_size(params['params'])
-print(f"Model has {n_params} {args.dtype} parameters")
+key = jax.random.PRNGKey(np.random.randint(0, 100))
+inputs = hi.random_state(key)
+params = ma.init(key, inputs)
 
 # Time model call
-# print("Model call:")
-# output, runtime = time_fn(ma.apply, params, x)
-# print(f"- evaluation: {runtime} seconds")
+print(f"Model call ({vs.n_parameters} {args.dtype} parameters):")
+output, runtime = time_fn(ma.apply, params, inputs, repetitions=args.repetitions)
+print(f"- evaluation: {runtime} seconds")
 
 # Time sampling
-print("Sampling:")
+print(f"Sampling {vs.n_samples} configurations:")
 output, runtime = time_fn(vs.sample)
 print(f"- compilation+evaluation: {runtime} seconds")
-output, runtime = time_fn(vs.sample)
+output, runtime = time_fn(vs.sample, repetitions=args.repetitions)
 print(f"- evaluation: {runtime} seconds")
 
 # Time energy and grad
 print("Energy and grad:")
 output, runtime = time_fn(vs.expect_and_grad, ha.collect())
 print(f"- compilation+evaluation: {runtime} seconds")
-output, runtime = time_fn(vs.expect_and_grad, ha.collect())
+output, runtime = time_fn(vs.expect_and_grad, ha.collect(), repetitions=args.repetitions)
 print(f"- evaluation: {runtime} seconds")
 
 # Time optimization
 print("Optimization:")
 output, runtime = time_fn(vmc.advance)
 print(f"- compilation+evaluation: {runtime} seconds")
-output, runtime = time_fn(vmc.advance)
+output, runtime = time_fn(vmc.advance, repetitions=args.repetitions)
 print(f"- evaluation: {runtime} seconds")
+output, runtime = time_fn(vmc._forward_and_backward, repetitions=args.repetitions)
+print(f"\t|--> forward_and_backward: {runtime} seconds")
+output, runtime = time_fn(vmc.update_parameters, output, repetitions=args.repetitions)
+print(f"\t|--> update_parameters: {runtime} seconds")
