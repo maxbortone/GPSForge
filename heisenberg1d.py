@@ -190,6 +190,8 @@ if config.compare_to_ed:
     if exact_energy is None:
         exact_energy = scipy.sparse.linalg.eigsh(ha.to_sparse(),k=1,which='SA',return_eigenvectors=False)[0]
     if rank == 0:
-        print(f"Estimated energy is: {estimated_energy}")
-        print(f"Exact energy is: {exact_energy}")
-        print(f"Relative error is: {abs((estimated_energy.mean-exact_energy)/exact_energy)}")
+        print(f"\nEstimated energy:\t{estimated_energy}")
+        print(f"Exact energy:\t\t{exact_energy}")
+        print(f"Relative error:\t\t{abs((estimated_energy.mean-exact_energy)/exact_energy)}")
+if config.save:
+    print(f"\nResult saved at {path}")
