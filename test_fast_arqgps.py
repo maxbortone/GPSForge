@@ -1,14 +1,12 @@
-import time
 import jax
 import jax.numpy as jnp
 import numpy as np
 import netket as nk
 from flax.core import freeze
 from arqgps import ARQGPS, FastARQGPS
-from autoreg import ARDirectSampler
 
 
-key_in, key_model = jax.random.split(jax.random.PRNGKey(2))
+key_in, key_model = jax.random.split(jax.random.PRNGKey(np.random.randint(0, 100)))
 L = 20
 N = 2
 B = 16

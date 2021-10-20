@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import netket as nk
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 from flax.core.frozen_dict import freeze, unfreeze
 from utils import restore_model
@@ -71,8 +72,17 @@ freqs = hist/M
 inputs = hi.all_states()
 A = len(inputs)//B
 probs = np.zeros(len(inputs))
-for i in range(A):
+for i in tqdm(range(A)):
     log_psi = arqgps_symm.apply(variables, inputs[i*B:(i+1)*B, :])
     probs[i*B:(i+1)*B] = np.abs(np.exp(log_psi))**2
 
 np.testing.assert_allclose(freqs, probs, atol=1e-3, rtol=1e-5)
+
+fig, ax = plt.subplots()
+ax.bar(edges[:-1]-0.25, freqs, width=0.5, color='C0', align='center', label="sampled")
+ax.bar(np.arange(hi.n_states)+0.25, probs, width=0.5, color='C1', align='center', label="true")
+ax.legend(loc="best")
+ax.set_ylabel("Probability")
+ax.set_xlabel("Configuration")
+plt.tight_layout()
+plt.show()
