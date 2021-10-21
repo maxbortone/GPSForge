@@ -1,3 +1,4 @@
+from functools import partial
 import os
 import configargparse
 import netket as nk
@@ -45,7 +46,7 @@ parser.add_argument('--chains', type=int, default=1,
     help='Number of chains used in VMC (default: 1)')
 parser.add_argument('--iterations', type=int, default=100,
     help='Number of VMC iterations (default: 100)')
-parser.add_argument('--optimizer', default='sgd-sr', choices=['sgd', 'sgd-sr', 'adam'],
+parser.add_argument('--optimizer', default='sgd-sr', choices=['sgd', 'sgd-sr', 'sgd-sr-dense', 'adam'],
     help='Optimizer used for learning (default: SGD)')
 parser.add_argument('--learning-rate', type=float, default=0.01,
     help='Learning rate of SGD or Adam (default: 0.01)')
@@ -98,7 +99,7 @@ ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=config.msr)
 if config.dtype == 'real':
     dtype = jnp.float64
 elif config.dtype == 'complex':
-    dtype = jnp.complex64
+    dtype = jnp.complex128
 if config.ansatz in ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     eps_init = gaussian(scale=config.scale, maxval=config.maxval, dtype=dtype)
 if config.ansatz == 'qgps':
@@ -131,6 +132,12 @@ if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
+# Variational state
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
+else:
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
+
 # Optimizer
 if config.optimizer == 'sgd':
     op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
@@ -138,15 +145,14 @@ if config.optimizer == 'sgd':
 elif config.optimizer == 'sgd-sr':
     op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
     sr = nk.optimizer.SR(diag_shift=config.diagonal_shift, iterative=config.sr_iterative)
+elif config.optimizer == 'sgd-sr-dense':
+    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
+    sr = nk.optimizer.SR(qgt=partial(nk.optimizer.qgt.QGTJacobianDense, mode=config.dtype), iterative=config.sr_iterative)
 elif config.optimizer == 'adam':
     op = nk.optimizer.Adam(learning_rate=config.learning_rate, b1=config.b1, b2=config.b2)
     sr = None
 
 # Variational Monte Carlo driver
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
-else:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
 vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
 # Print parameter structure
