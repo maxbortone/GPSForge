@@ -6,8 +6,8 @@ from netket.hilbert import Spin
 from netket.utils import HashableArray
 from netket.utils.group import PermutationGroup
 from netket.utils.types import DType, Array, NNInitFunc
-from netket.models import ARNN
-from netket.nn.initializers import ones
+from netket.models import AbstractARNN
+from jax.nn.initializers import ones
 from initializers import gaussian
 
 
@@ -16,25 +16,26 @@ def local_states_to_indices(hilbert : Spin, states : Array) -> Array:
     indices = jnp.asarray(indices, jnp.int32)
     return indices
 
-def l2_normalize(log_psi : Array) -> Array:
-    return log_psi - 0.5*logsumexp(2*log_psi.real, axis=-1, keepdims=True)
+def normalize(log_psi : Array, machine_pow: int) -> Array:
+    return log_psi - (1/machine_pow)*logsumexp(machine_pow*log_psi.real, axis=-1, keepdims=True)
 
 
-class ARQGPS(ARNN):
+class ARQGPS(AbstractARNN):
 
     N: jnp.integer = 1
     L: jnp.integer = 1
     dtype: DType = jnp.float64
     eps_init: NNInitFunc = gaussian(scale=0.0)
+    machine_pow: int = 2
 
     def _conditional(self, inputs: Array, index: int) -> Array:
         log_psi = _conditionals(self, inputs)
-        p = jnp.exp(2*log_psi.real)[:, index, :]
+        p = jnp.exp(self.machine_pow*log_psi.real)[:, index, :]
         return p # (B, 2)
 
     def conditionals(self, inputs: Array) -> Array:
         log_psi = _conditionals(self, inputs)
-        p = jnp.exp(2*log_psi.real)
+        p = jnp.exp(self.machine_pow*log_psi.real)
         return p # (B, L, 2)
 
     def setup(self):
@@ -46,13 +47,14 @@ class ARQGPS(ARNN):
         return _call(self, inputs)
 
 
-class FastARQGPS(ARNN):
+class FastARQGPS(AbstractARNN):
 
     N: jnp.integer = 1
     L: jnp.integer = 1
     B: jnp.integer = 1
     dtype: DType = jnp.float64
     eps_init: NNInitFunc = gaussian(scale=0.0)
+    machine_pow: int = 2
 
     def setup(self):
         self._eps = self.param("epsilon", self.eps_init, (2, self.N, self.L), self.dtype)
@@ -60,12 +62,12 @@ class FastARQGPS(ARNN):
 
     def _conditional(self, inputs: Array, index: int) -> Array:
         log_psi = _conditional(self, inputs, index)
-        p = jnp.exp(2*log_psi.real)
+        p = jnp.exp(self.machine_pow*log_psi.real)
         return p # (B, 2)
 
     def conditionals(self, inputs: Array) -> Array:
         log_psi = _conditionals(self, inputs)
-        p = jnp.exp(2*log_psi.real)
+        p = jnp.exp(self.machine_pow*log_psi.real)
         return p # (B, L, 2)
 
     def __call__(self, inputs: Array) -> Array:
@@ -74,7 +76,7 @@ class FastARQGPS(ARNN):
         return _call(self, inputs)
 
 
-class FastARQGPSSymm(ARNN):
+class FastARQGPSSymm(AbstractARNN):
 
     symmetries: Union[HashableArray, PermutationGroup]
     N: jnp.integer = 1
@@ -82,6 +84,7 @@ class FastARQGPSSymm(ARNN):
     B: jnp.integer = 1
     dtype: DType = jnp.float64
     eps_init: NNInitFunc = gaussian(scale=0.0)
+    machine_pow: int = 2
 
     def setup(self):
         self._eps = self.param("epsilon", self.eps_init, (2, self.N, self.L), self.dtype)
@@ -91,12 +94,12 @@ class FastARQGPSSymm(ARNN):
 
     def _conditional(self, inputs: Array, index: int) -> Array:
         log_psi = _conditional(self, inputs, index)
-        p = jnp.exp(2*log_psi.real)
+        p = jnp.exp(self.machine_pow*log_psi.real)
         return p # (B, 2)
 
     def conditionals(self, inputs: Array) -> Array:
         log_psi = _conditionals(self, inputs)
-        p = jnp.exp(2*log_psi.real)
+        p = jnp.exp(self.machine_pow*log_psi.real)
         return p # (B, L, 2)
 
     def __call__(self, inputs: Array) -> Array:
@@ -153,7 +156,7 @@ def _conditional(model, inputs, index):
 
     # Compute log-probabilities
     log_psi = jnp.sum(prods, axis=-1) # (B, 2)
-    log_psi = l2_normalize(log_psi)
+    log_psi = normalize(log_psi, model.machine_pow)
     return log_psi # (B, 2)
 
 def _compute_conditionals(eps, input):
@@ -175,7 +178,7 @@ def _compute_conditionals(eps, input):
 def _conditionals(model, inputs):
     inputs = local_states_to_indices(model.hilbert, inputs)
     log_psi = jax.vmap(_compute_conditionals, in_axes=(None, 0))(model._eps, inputs)
-    log_psi = l2_normalize(log_psi)
+    log_psi = normalize(log_psi, model.machine_pow)
     return log_psi # (B, L, 2)
 
 def _call(model, inputs):
