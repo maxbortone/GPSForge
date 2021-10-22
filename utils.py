@@ -118,12 +118,13 @@ def get_exact_energy(model, config):
             exact_energy = df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
     return exact_energy
 
-def time_fn(fn, *args, repetitions=1):
+def time_fn(fn, *args, repetitions=1, block=True):
     runtimes = []
     for _ in range(repetitions):
         start = timer()
         output = fn(*args)
-        jax.tree_map(lambda x: x.block_until_ready(), output)
+        if block:
+            jax.tree_map(lambda x: x.block_until_ready(), output)
         end = timer()
         runtime = timedelta(seconds=end-start)
         runtimes.append(runtime)
