@@ -5,10 +5,11 @@ import scipy
 import numpy as np
 import jax.numpy as jnp
 from mpi4py import MPI
-from initializers import gaussian
+from functools import partial
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
 from autoreg import ARDirectSampler
+from initializers import gaussian
 from utils import create_result, dir_path, get_exact_energy, save_config
 
 
@@ -164,6 +165,9 @@ if config.optimizer == 'sgd':
 elif config.optimizer == 'sgd-sr':
     op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
     sr = nk.optimizer.SR(diag_shift=config.diagonal_shift, iterative=config.sr_iterative)
+elif config.optimizer == 'sgd-sr-dense':
+    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
+    sr = nk.optimizer.SR(qgt=partial(nk.optimizer.qgt.QGTJacobianDense, mode=config.dtype, diag_shift=config.diagonal_shift), iterative=config.sr_iterative)
 elif config.optimizer == 'adam':
     op = nk.optimizer.Adam(learning_rate=config.learning_rate, b1=config.b1, b2=config.b2)
     sr = None

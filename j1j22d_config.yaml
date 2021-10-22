@@ -8,8 +8,6 @@ ansatz: arqgps-fast
 dtype: real
 samples: 1000
 iterations: 100
-optimizer: 'sgd-sr'
+optimizer: 'sgd-sr-dense'
 learning-rate: 0.01
 diagonal-shift: 0.01
-msr: True
-#no-msr: True
