@@ -125,7 +125,7 @@ ha = nk.operator.GraphOperator(hilbert=hi, graph=g, bond_ops=bond_operator, bond
 if config.dtype == 'real':
     dtype = jnp.float64
 elif config.dtype == 'complex':
-    dtype = jnp.complex64
+    dtype = jnp.complex128
 if config.ansatz in ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     eps_init = gaussian(scale=config.scale, maxval=config.maxval, dtype=dtype)
 if config.ansatz == 'qgps':
