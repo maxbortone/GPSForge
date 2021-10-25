@@ -18,7 +18,7 @@ def dir_path(string):
     else:
         raise NotADirectoryError(string)
 
-def parse_num_list(string):
+def parse_range(string):
     m = re.match(r'(\d+)(?:-(\d+))?$', string)
     # ^ (or use .split('-'). anyway you like.)
     if not m:
@@ -26,6 +26,13 @@ def parse_num_list(string):
     start = m.group(1)
     end = m.group(2) or start
     return list(range(int(start,10), int(end,10)+1))
+
+def parse_int_or_iterable(string):
+    if len(string)>1:
+        l = tuple([int(s) for s in string.split(',')])
+    else:
+        l = int(string)
+    return l
 
 def create_result(path):
     uid = uuid.uuid4().hex

@@ -1,4 +1,5 @@
 import os
+from typing import Iterable, Union
 import configargparse
 import netket as nk
 import scipy
@@ -10,7 +11,7 @@ from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
 from autoreg import ARDirectSampler
 from initializers import gaussian
-from utils import create_result, dir_path, get_exact_energy, save_config
+from utils import create_result, dir_path, get_exact_energy, parse_int_or_iterable, save_config
 
 
 # MPI variables
@@ -34,11 +35,20 @@ parser.add_argument('--N', type=int, default=1,
     help='Bond dimension of the QGPS Ansatz (default: 1)')
 parser.add_argument('--alpha', type=int, default=1,
     help='Feature density of the RBM Ansatz (default: 1)')
+parser.add_argument('--layers', type=int, default=1,
+    help='Number of layers in the ARNN Ansatz (default: 1)')
+parser.add_argument('--features', type=parse_int_or_iterable, default=4,
+    help='Number of features per layer in the ARNN Ansatz (default: 4)')
+parser.add_argument('--kernel-size', type=parse_int_or_iterable, default=1,
+    help='Kernel size of the ARNNConv Ansatz (default: 1)')
+parser.add_argument('--kernel-dilation', type=parse_int_or_iterable, default=1,
+    help='Kernel dilation of the ARNNConv Ansatz (default: 1)')
 parser.add_argument('--scale', type=float, default=0.01,
     help='Scale of the initialized QGPS Ansatz parameters (default: 0.01)')
 parser.add_argument('--maxval', type=float, default=0.1,
     help='Max value of the phase of the initialized complex QGPS Ansatz parameters (default: 0.1)')
-parser.add_argument('--ansatz', default='qgps', choices=['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'rbm', 'rbm-symm'],
+parser.add_argument('--ansatz', default='qgps',
+    choices=['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'rbm', 'rbm-symm', 'arnn-dense', 'arnn-conv1d', 'arnn-conv2d'],
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
@@ -99,7 +109,7 @@ for i in range(L):
 g = nk.graph.Graph(edges=edge_colors)
 
 # Hilbert space of spins on the graph
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
 else:
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
@@ -151,12 +161,47 @@ elif config.ansatz == 'rbm-symm':
         use_hidden_bias=True,
         dtype=dtype,
     )
+elif config.ansatz == 'arnn-dense':
+    ma = nk.models.ARNNDense(
+        hilbert=hi,
+        layers=config.layers,
+        features=config.features,
+        dtype=dtype
+    )
+elif config.ansatz == 'arnn-conv1d':
+    ma = nk.models.FastARNNConv1D(
+        hilbert=hi,
+        layers=config.layers,
+        features=config.features,
+        kernel_size=config.kernel_size,
+        kernel_dilation=config.kernel_dilation,
+        dtype=dtype
+    )
+elif config.ansatz == 'arnn-conv2d':
+    if isinstance(config.kernel_dilation, int):
+        config.kernel_dilation = (config.kernel_dilation, config.kernel_dilation)
+    ma = nk.models.FastARNNConv2D(
+        hilbert=hi,
+        layers=config.layers,
+        features=config.features,
+        kernel_size=config.kernel_size,
+        kernel_dilation=config.kernel_dilation,
+        dtype=dtype
+    )
 
 # Sampler
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
+    sa = nk.sampler.ARDirectSampler(hi)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains, d_max=2)
+
+# Variational state
+if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
+else:
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
 
 # Optimizer
 if config.optimizer == 'sgd':
@@ -173,10 +218,6 @@ elif config.optimizer == 'adam':
     sr = None
 
 # Variational Monte Carlo driver
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
-else:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
 vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
 # Print parameter structure
@@ -184,6 +225,8 @@ msr_status = 'on' if config.msr else 'off'
 if rank == 0:
     if config.ansatz in ['rbm', 'rbm-symm']:
         print(f"Running optimisation of {config.ansatz} with alpha={config.alpha}")
+    elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
+        print(f"Running optimisation of {config.ansatz} with layers={config.layers}")
     else:
         print(f"Running optimisation of {config.ansatz} with N={config.N}")
     print(f"- # {config.dtype} variational parameters: {vs.n_parameters}")

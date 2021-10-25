@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from utils import get_exact_energy, parse_num_list, dir_path, list_results, read_config, unpack_result
+from utils import get_exact_energy, parse_range, dir_path, list_results, read_config, unpack_result
 
 
 # Parse arguments
@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(
     description='Compare different series of results for a model as a function of bond dimension and sample size')
 parser.add_argument('--L', type=int, required=True,
     help='Number of sites in the system')
-parser.add_argument('--N', type=parse_num_list, required=True,
+parser.add_argument('--N', type=parse_range, required=True,
     help='Range of bond dimensions')
 parser.add_argument('--dtype', choices=['real', 'complex'],
     help='Type of the Ansatz parameters')
