@@ -155,7 +155,7 @@ elif config.ansatz == 'arnn-conv1d':
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
-    sa = nk.sampler.ARDirectSampler(hi)
+    sa = nk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
