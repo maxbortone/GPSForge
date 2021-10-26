@@ -64,7 +64,7 @@ g = sns.relplot(
     x='N', y='rel_error',
     hue='ansatz', style='ansatz', size='samples',
     col='msr', row='dtype',
-    col_order=[True, False],
+    col_order=sorted(np.unique(df['msr']), reverse=True),
     markers=True, dashes=False)
 g.set(yscale='log')
 g.tight_layout()
