@@ -28,10 +28,11 @@ def parse_range(string):
     return list(range(int(start,10), int(end,10)+1))
 
 def parse_int_or_iterable(string):
-    if len(string)>1:
-        l = tuple([int(s) for s in string.split(',')])
+    vals = string.split(',')
+    if len(vals)>1:
+        l = tuple([int(v) for v in vals])
     else:
-        l = int(string)
+        l = int(vals[0])
     return l
 
 def create_result(path):
