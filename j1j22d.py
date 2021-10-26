@@ -1,5 +1,4 @@
 import os
-from typing import Iterable, Union
 import configargparse
 import netket as nk
 import scipy
@@ -244,13 +243,12 @@ if config.save:
     vmc.run(n_iter=config.iterations, out=logger, show_progress=config.progress)
 else:
     if rank == 0:
-        print("Iteration\t Energy statistics\t Gradient norm")
+        print("Iteration\t Energy statistics\t\t Gradient norm")
     for it in vmc.iter(config.iterations, 10):
         if rank == 0:
-            if config.ansatz in ['rbm', 'rbm-symm']:
-                print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['Dense']['kernel'])}")
-            else:
-                print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {np.linalg.norm(vmc._loss_grad['epsilon'])}")
+            grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
+            grad_norm = np.linalg.norm(grad)
+            print(f"[{it+10}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm}")
 
 if config.compare_to_ed:
     # Get converged energy estimate
