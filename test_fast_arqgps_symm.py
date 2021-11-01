@@ -8,7 +8,7 @@ from flax.core.frozen_dict import freeze, unfreeze
 from utils import restore_model
 from jax.scipy.special import logsumexp
 from arqgps import FastARQGPS, FastARQGPSSymm
-from autoreg import ARDirectSampler
+from autoreg import ARDirectSamplerSymm
 from initializers import gaussian
 
 
@@ -22,8 +22,8 @@ eps_init = gaussian(scale=0.01)
 g = nk.graph.Chain(length=L, pbc=True)
 hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes)
 symmetries = g.automorphisms()
-arqgps = FastARQGPS(hilbert=hi, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex64)
-arqgps_symm = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex64)
+arqgps = FastARQGPS(hilbert=hi, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
+arqgps_symm = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
 inputs = hi.random_state(key, B)
 variables = arqgps_symm.init(key, inputs)
 
@@ -33,7 +33,7 @@ variables = arqgps_symm.init(key, inputs)
 T = symmetries.shape[0]
 symmetries = symmetries.to_array()
 log_psi_symm = arqgps_symm.apply(variables, inputs)
-log_psi = jnp.zeros((T, B), dtype=jnp.complex64)
+log_psi = jnp.zeros((T, B), dtype=jnp.complex128)
 for t in tqdm(range(T)):
     inputs_t = jnp.take_along_axis(inputs, jnp.tile(symmetries[t], (B, 1)), 1)
     y = arqgps.apply(variables, inputs_t)
@@ -56,7 +56,7 @@ variables = freeze(variables)
 
 # Frequency of sampled configurations should be proportional
 # to squared amplitudes of symmetrized model
-sa = ARDirectSampler(hi, n_chains_per_rank=B)
+sa = ARDirectSamplerSymm(hi, n_chains_per_rank=B)
 vs = nk.vqs.MCState(sa, arqgps_symm, n_samples=B, variables=variables)
 S = 100000
 M = S*B
@@ -76,7 +76,7 @@ for i in tqdm(range(A)):
     log_psi = arqgps_symm.apply(variables, inputs[i*B:(i+1)*B, :])
     probs[i*B:(i+1)*B] = np.abs(np.exp(log_psi))**2
 
-np.testing.assert_allclose(freqs, probs, atol=1e-3, rtol=1e-5)
+np.testing.assert_allclose(freqs, probs, atol=1e-2, rtol=1e-3)
 
 fig, ax = plt.subplots()
 ax.bar(edges[:-1]-0.25, freqs, width=0.5, color='C0', align='center', label="sampled")

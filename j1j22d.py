@@ -8,7 +8,7 @@ from mpi4py import MPI
 from functools import partial
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
-from autoreg import ARDirectSampler
+from autoreg import ARDirectSampler, ARDirectSamplerSymm
 from initializers import gaussian
 from utils import create_result, dir_path, get_exact_energy, parse_int_or_iterable, save_config
 
@@ -191,6 +191,8 @@ elif config.ansatz == 'arnn-conv2d':
 # Sampler
 if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
     sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+if config.ansatz == 'arqgps-fast-symm':
+    sa = ARDirectSamplerSymm(hi, n_chains_per_rank=samples_per_rank)
 elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
     sa = nk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 else:

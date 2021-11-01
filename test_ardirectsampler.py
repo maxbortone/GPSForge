@@ -4,7 +4,7 @@ import numpy as np
 import netket as nk
 from mpi4py import MPI
 from arqgps import FastARQGPS, FastARQGPSSymm
-from autoreg import ARDirectSampler
+from autoreg import ARDirectSampler, ARDirectSamplerSymm
 from initializers import gaussian
 
 
@@ -31,7 +31,8 @@ hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes)
 ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=False)
 
 # Test #1
-ma = FastARQGPS(hilbert=hi, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex64)
+# Shape of sample should be (1, samples_per_rank, L)
+ma = FastARQGPS(hilbert=hi, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex128)
 sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 vs = nk.vqs.MCState(sa, ma, n_samples=n_samples)
 samples = vs.sample()
@@ -44,9 +45,10 @@ if rank == 0:
 np.testing.assert_equal(samples.shape, (1, samples_per_rank, L))
 
 # Test #2
+# Shape of sample should be (1, samples_per_rank, L)
 symmetries = g.automorphisms()
-ma = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex64)
-sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+ma = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex128)
+sa = ARDirectSamplerSymm(hi, n_chains_per_rank=samples_per_rank)
 vs = nk.vqs.MCState(sa, ma, n_samples=n_samples)
 samples = vs.sample()
 if rank == 0:
@@ -56,4 +58,9 @@ if rank == 0:
     print(f"- vqs.chain_length = {vs.chain_length}")
     print(f"- samples.shape = {samples.shape}")
 np.testing.assert_equal(samples.shape, (1, samples_per_rank, L))
+
+# Test #3
+# Generated sample should have zero total magnetization
+print(f"- samples:\n{samples}")
+np.testing.assert_equal(np.sum(np.squeeze(samples), axis=-1), np.zeros(n_samples))
 
