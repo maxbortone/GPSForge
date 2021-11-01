@@ -189,9 +189,9 @@ elif config.ansatz == 'arnn-conv2d':
     )
 
 # Sampler
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+if config.ansatz in ['arqgps', 'arqgps-fast']:
     sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
-if config.ansatz == 'arqgps-fast-symm':
+elif config.ansatz == 'arqgps-fast-symm':
     sa = ARDirectSamplerSymm(hi, n_chains_per_rank=samples_per_rank)
 elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
     sa = nk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
