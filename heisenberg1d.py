@@ -47,6 +47,8 @@ parser.add_argument('--ansatz', default='qgps',
     help='Ansatz for the wavefunction (default: qgps)')
 parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
+parser.add_argument('--constrained', type=bool, default=False,
+    help='Whether to constrain the Hilbert space to the zero magnetization sector (default: False)')
 parser.add_argument('--samples', type=int, default=1000,
     help='Number of samples used in VMC (default: 1000)')
 parser.add_argument('--discard', type=int, default=100,
@@ -96,10 +98,12 @@ samples_per_rank = config.samples // n_nodes
 g = nk.graph.Chain(length=config.L, pbc=True)
 
 # Hilbert space of spins on the graph
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
-    hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
-else:
+if config.constrained:
+    if config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
+        raise ValueError("ARNN Ansatze do not support constrained Hilbert spaces")
     hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
+else:
+    hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
 
 # Heisenberg spin hamiltonian
 ha = nk.operator.Heisenberg(hilbert=hi, graph=g, sign_rule=config.msr)
