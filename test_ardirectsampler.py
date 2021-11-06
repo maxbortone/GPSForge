@@ -4,7 +4,7 @@ import numpy as np
 import netket as nk
 from mpi4py import MPI
 from arqgps import FastARQGPS, FastARQGPSSymm
-from autoreg import ARDirectSampler, ARDirectSamplerSymm
+from autoreg import ARDirectSampler
 from initializers import gaussian
 
 
@@ -44,11 +44,9 @@ if rank == 0:
     print(f"- samples.shape = {samples.shape}")
 np.testing.assert_equal(samples.shape, (1, samples_per_rank, L))
 
-# Test #2
-# Shape of sample should be (1, samples_per_rank, L)
 symmetries = g.automorphisms()
 ma = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex128)
-sa = ARDirectSamplerSymm(hi, n_chains_per_rank=samples_per_rank)
+sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
 vs = nk.vqs.MCState(sa, ma, n_samples=n_samples)
 samples = vs.sample()
 if rank == 0:
@@ -59,8 +57,24 @@ if rank == 0:
     print(f"- samples.shape = {samples.shape}")
 np.testing.assert_equal(samples.shape, (1, samples_per_rank, L))
 
-# Test #3
-# Generated sample should have zero total magnetization
+# Test #2
+# When sampling from a constrained Hilbert space,
+# autoregressive models should generate samples with 
+# same total magnetization
+hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes, total_sz=0)
+ma = FastARQGPS(hilbert=hi, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex128)
+sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+vs = nk.vqs.MCState(sa, ma, n_samples=n_samples)
+samples = vs.sample()
+print("FastARQGPS:")
+print(f"- samples:\n{samples}")
+np.testing.assert_equal(np.sum(np.squeeze(samples), axis=-1), np.zeros(n_samples))
+
+ma = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=samples_per_rank, eps_init=eps_init, dtype=jnp.complex128)
+sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+vs = nk.vqs.MCState(sa, ma, n_samples=n_samples)
+samples = vs.sample()
+print("FastARQGPSSymm:")
 print(f"- samples:\n{samples}")
 np.testing.assert_equal(np.sum(np.squeeze(samples), axis=-1), np.zeros(n_samples))
 
