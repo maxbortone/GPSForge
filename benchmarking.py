@@ -17,10 +17,7 @@ def benchmark(L, N, ansatz, samples):
     g = nk.graph.Chain(length=L, pbc=True)
 
     # Hilbert space of spins on the graph
-    if ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-        hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes)
-    else:
-        hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
+    hi = nk.hilbert.Spin(s=1 / 2, N=g.n_nodes, total_sz=0)
 
     # Heisenberg spin hamiltonian
     ha = nk.operator.Heisenberg(hilbert=hi, graph=g)
@@ -31,12 +28,12 @@ def benchmark(L, N, ansatz, samples):
     samples_per_rank = samples // n_nodes
 
     # Ansatz machine
-    dtype = jnp.complex64
+    dtype = jnp.complex128
     eps_init = gaussian(scale=0.001, maxval=0.1, dtype=dtype)
     if ansatz == 'qgps':
         ma = QGPS(N=N, eps_init=eps_init, dtype=dtype)
     elif ansatz == 'arqgps':
-        ma = ARQGPS(hilbert=hi, N=N, L=L,  eps_init=eps_init, dtype=dtype)
+        ma = ARQGPS(hilbert=hi, N=N, L=L, eps_init=eps_init, dtype=dtype)
     elif ansatz == 'arqgps-fast':
         ma = FastARQGPS(hilbert=hi, N=N, L=L, B=samples_per_rank,  eps_init=eps_init, dtype=dtype)
     elif ansatz == 'arqgps-fast-symm':
@@ -49,7 +46,7 @@ def benchmark(L, N, ansatz, samples):
         sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=1)
 
     # VMC state
-    if ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+    if sa.is_exact:
         vs = nk.vqs.MCState(sa, ma, n_samples=args.samples)
     else:
         vs = nk.vqs.MCState(sa, ma, n_samples=args.samples, n_discard_per_chain=int(args.samples/10))
@@ -86,9 +83,9 @@ parser.add_argument('--samples', type=int, default=1000,
 args = parser.parse_args()
 
 # Run benchmark
-N = 10
-L = np.array([10, 20, 50, 100])
-ansatze = ['qgps', 'arqgps-fast', 'arqgps-fast-symm']
+N = 2
+L = np.array([10, 20, 40, 80], dtype=np.int32)
+ansatze = ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']
 runtimes = {
     'sampling': {ansatz: [] for ansatz in ansatze},
     'inference': {ansatz: [] for ansatz in ansatze},
@@ -97,7 +94,7 @@ runtimes = {
 for ansatz in ansatze:
     print(f"Running benchmarks for {ansatz}:")
     for l in tqdm(L):
-        runtime_s, runtime_i, runtime_e = benchmark(l, N, ansatz, args.samples)
+        runtime_s, runtime_i, runtime_e = benchmark(int(l), N, ansatz, args.samples)
         runtimes['sampling'][ansatz].append(runtime_s)
         runtimes['inference'][ansatz].append(runtime_i)
         runtimes['evaluation'][ansatz].append(runtime_e)
@@ -107,15 +104,18 @@ for ansatz in ansatze:
 
 # Plot
 fig, ax = plt.subplots(3, 1, sharex=True)
-ax[0].plot(L, L/10, 'k--', label=r"$\mathcal{O}(L)$")
-ax[0].plot(L, (L/10)**2, 'k-.', label=r"$\mathcal{O}(L^2)$")
-ax[1].plot(L, L/10, 'k--')
-ax[2].plot(L, (L/10)**2, 'k-.')
+ax[0].plot(L, L/L[0], 'k--', label=r"$\mathcal{O}(L)$")
+ax[0].plot(L, (L/L[0])**2, 'k-.', label=r"$\mathcal{O}(L^2)$")
+ax[1].plot(L, L/L[0], 'k--')
+ax[1].plot(L, (L/L[0])**2, 'k-.')
+ax[2].plot(L, L/L[0], 'k--')
+ax[2].plot(L, (L/L[0])**2, 'k-.')
 for i, ansatz in enumerate(ansatze):
     ax[0].plot(L, runtimes['sampling'][ansatz], color=f"C{i}", marker="o", linestyle="-", label=ansatz)
     ax[1].plot(L, runtimes['inference'][ansatz], color=f"C{i}", marker="o", linestyle="-")
     ax[2].plot(L, runtimes['evaluation'][ansatz], color=f"C{i}", marker="o", linestyle="-")
 ax[0].set_yscale("log")
+ax[1].set_yscale("log")
 ax[2].set_yscale("log")
 ax[2].set_xlabel("System size")
 ax[0].set_ylabel("Runtime")
