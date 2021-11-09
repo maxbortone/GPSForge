@@ -14,6 +14,8 @@ parser.add_argument('--L', type=int, required=True,
     help='Number of sites in the system')
 parser.add_argument('--N', type=parse_range, required=True,
     help='Range of bond dimensions')
+parser.add_argument('--J2', type=float,
+    help='Next-nearest neighbor coupling')
 parser.add_argument('--dtype', choices=['real', 'complex'],
     help='Type of the Ansatz parameters')
 parser.add_argument('--paths', type=dir_path, nargs='+',
@@ -35,6 +37,8 @@ df = df.loc[df['L'] == args.L]
 df = df.loc[df['N'].isin(args.N)]
 if args.dtype:
     df = df.loc[df['dtype'] == args.dtype]
+if args.J2:
+    df = df.loc[df['J2'] == args.J2]
 df = df.reset_index()
 df = df.sort_values(by=['N', 'ansatz', 'dtype', 'msr', 'samples'], ascending=[True, True, False, True, True])
 
