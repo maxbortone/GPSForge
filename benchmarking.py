@@ -2,7 +2,10 @@ import argparse
 import netket as nk
 import jax.numpy as jnp
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 from mpi4py import MPI
 from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
@@ -65,10 +68,10 @@ def benchmark(L, N, ansatz, samples):
     _, _ = time_fn(vs.expect, ha)
     _, runtime_e = time_fn(vs.expect, ha)
 
-    return [runtime_s, runtime_i, runtime_e]
+    return np.array([runtime_s, runtime_i, runtime_e])
 
 # Set style
-plt.style.use('seaborn-dark')
+sns.set_theme(style='dark')
 
 # MPI variables
 comm = MPI.COMM_WORLD.Create(MPI.COMM_WORLD.Get_group())
@@ -86,46 +89,40 @@ args = parser.parse_args()
 N = 2
 L = np.array([10, 20, 40, 80], dtype=np.int32)
 ansatze = ['qgps', 'arqgps', 'arqgps-fast', 'arqgps-fast-symm']
-runtimes = {
-    'sampling': {ansatz: [] for ansatz in ansatze},
-    'inference': {ansatz: [] for ansatz in ansatze},
-    'evaluation': {ansatz: [] for ansatz in ansatze},
-}
+modes = ['sampling', 'inference', 'evaluation']
+data = []
 for ansatz in ansatze:
     print(f"Running benchmarks for {ansatz}:")
     for l in tqdm(L):
-        runtime_s, runtime_i, runtime_e = benchmark(int(l), N, ansatz, args.samples)
-        runtimes['sampling'][ansatz].append(runtime_s)
-        runtimes['inference'][ansatz].append(runtime_i)
-        runtimes['evaluation'][ansatz].append(runtime_e)
-    runtimes['sampling'][ansatz] = np.array(runtimes['sampling'][ansatz])/runtimes['sampling'][ansatz][0]
-    runtimes['inference'][ansatz] = np.array(runtimes['inference'][ansatz])/runtimes['inference'][ansatz][0]
-    runtimes['evaluation'][ansatz] = np.array(runtimes['evaluation'][ansatz])/runtimes['evaluation'][ansatz][0]
+        runtimes = benchmark(int(l), N, ansatz, args.samples)
+        for mode, runtime in zip(modes, runtimes):
+            row = {}
+            row['ansatz'] = ansatz
+            row['L'] = l
+            row['runtime'] = runtime
+            row['mode'] = mode
+            data.append(row)
+df = pd.DataFrame(data=data)
 
 # Plot
-fig, ax = plt.subplots(3, 1, sharex=True)
-ax[0].plot(L, L/L[0], 'k--', label=r"$\mathcal{O}(L)$")
-ax[0].plot(L, (L/L[0])**2, 'k-.', label=r"$\mathcal{O}(L^2)$")
-ax[1].plot(L, L/L[0], 'k--')
-ax[1].plot(L, (L/L[0])**2, 'k-.')
-ax[2].plot(L, L/L[0], 'k--')
-ax[2].plot(L, (L/L[0])**2, 'k-.')
-for i, ansatz in enumerate(ansatze):
-    ax[0].plot(L, runtimes['sampling'][ansatz], color=f"C{i}", marker="o", linestyle="-", label=ansatz)
-    ax[1].plot(L, runtimes['inference'][ansatz], color=f"C{i}", marker="o", linestyle="-")
-    ax[2].plot(L, runtimes['evaluation'][ansatz], color=f"C{i}", marker="o", linestyle="-")
-ax[0].set_yscale("log")
-ax[1].set_yscale("log")
-ax[2].set_yscale("log")
-ax[2].set_xlabel("System size")
-ax[0].set_ylabel("Runtime")
-ax[1].set_ylabel("Runtime")
-ax[2].set_ylabel("Runtime")
-ax[0].set_title("Sampling")
-ax[1].set_title("Inference")
-ax[2].set_title("Evaluation")
-ax[0].legend(loc="best")
-ax[0].grid(True)
-ax[1].grid(True)
-ax[2].grid(True)
+f = sns.relplot(
+    data=df, kind='line',
+    x='L', y='runtime',
+    hue='ansatz', col='mode', legend=False)
+for ax in f.axes.ravel():
+    ax.plot(L, 1e-4*L, 'k--')
+    ax.plot(L, 1e-4*L**2, 'k--')
+f.axes[0, 0].legend(
+    loc="upper left",
+    handles=f.axes[0,0].lines[-2:],
+    labels=[r"$\mathcal{O}(L)$", r"$\mathcal{O}(L^2)$"])
+f.set(xscale='log', yscale='log')
+for ax in f.axes.ravel():
+    formatter = ScalarFormatter()
+    formatter.set_scientific(False)
+    ax.xaxis.set_minor_formatter(formatter)
+    ax.xaxis.set_major_formatter(formatter)
+f.set_axis_labels("L", "runtime (s)")
+f.set_titles("{col_name}")
+f.tight_layout(w_pad=0)
 plt.show()

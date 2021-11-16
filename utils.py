@@ -118,7 +118,7 @@ def get_literature_energy(model, ansatz, **filters):
         pass
     elif model == "j1j22d":
         path = os.path.join(base_path, f"result_{ansatz.upper()}_J1J2_2D.csv")
-        df = pd.read_csv(path, dtype={'L': np.int16, 'N': np.int16, 'symm': str, 'J1': np.float32, 'J2': np.float32, 'E_real': np.float32, 'E_imag': np.float32, 'error': np.float32})
+        df = pd.read_csv(path, skiprows=0, header=1)
         # Filter rows
         for key, value in filters.items():
             if isinstance(value, int) or isinstance(value, float) or isinstance(value, str):
@@ -139,7 +139,7 @@ def get_exact_energy(model, config):
             exact_energy = 4*df.loc[df['L']==config.L]['E'].values[0]
     elif model == "j1j22d":
         path = os.path.join(base_path, 'result_ED_J1J2_2D.csv')
-        df = pd.read_csv(path, dtype={'L': np.int16, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
+        df = pd.read_csv(path, skiprows=0, header=1, dtype={'L': np.int16, 'J1': np.float32, 'J2': np.float32, 'E/L^2': np.float32, 'E': np.float32})
         if ((df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)).any():
             exact_energy = df.loc[(df['L']==config.L) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
     return exact_energy
@@ -153,5 +153,5 @@ def time_fn(fn, *args, repetitions=1, block=True):
             jax.tree_map(lambda x: x.block_until_ready(), output)
         end = timer()
         runtime = timedelta(seconds=end-start)
-        runtimes.append(runtime)
+        runtimes.append(runtime.total_seconds())
     return output, np.mean(runtimes)

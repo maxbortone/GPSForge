@@ -81,9 +81,10 @@ print(df[['N', 'ansatz', 'samples', 'energy', 'error', 'rel_error', 'uuid']].to_
 f = sns.relplot(
     data=df, kind='line',
     x='N', y='rel_error',
-    hue='ansatz', style='samples',
-    markers=True, dashes=False)
-f.set(yscale='log')
+    hue='samples', style='ansatz',
+    markers=True, dashes=False,
+    palette='tab10', markersize=10)
+f.set(xscale='log', yscale='log')
 f.tight_layout()
 f.axes[0,0].set_ylabel(r"$|E_{\theta}-E_{gs}|/|E_{gs}|$")
 f.axes[0,0].set_xticks(np.unique(df['N']))
