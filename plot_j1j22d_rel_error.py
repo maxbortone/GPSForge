@@ -93,6 +93,7 @@ f = sns.relplot(
     hue='samples', style='ansatz',
     markers=True, dashes=False,
     palette='tab10', markersize=10)
+f.axes[0,0].axvspan(0.4, 0.6, facecolor='gray', alpha=0.3)
 f.tight_layout()
 if args.y == 'rel_error':
     f.axes[0,0].set_ylabel(r"$|E_{\theta}-E_{gs}|/|E_{gs}|$")
