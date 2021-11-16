@@ -10,7 +10,7 @@ from qgps import QGPS
 from arqgps import ARQGPS, FastARQGPS, FastARQGPSSymm
 from autoreg import ARDirectSampler
 from initializers import gaussian
-from utils import create_result, dir_path, get_exact_energy, parse_int_or_iterable, save_config
+from utils import create_result, dir_path, get_exact_energy, parse_int_or_iterable, restore_model, save_config
 
 
 # MPI variables
@@ -83,6 +83,8 @@ progress_parser.add_argument('--show-progress', dest='progress', action='store_t
 progress_parser.add_argument('--hide-progress', dest='progress', action='store_false',
     help='Hides the progress bar')
 parser.set_defaults(progress=True)
+parser.add_argument('--source', type=dir_path,
+    help='Path to source of initial parameters')
 parser.add_argument('--save', type=dir_path,
     help='Save result to path')
 
@@ -164,10 +166,13 @@ else:
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
 # Variational state
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm', 'arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
+variables = None
+if config.source is not None:
+    variables = restore_model(config.source)
+if sa.is_exact:
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, variables=variables)
 else:
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard)
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples, n_discard_per_chain=config.discard, variables=variables)
 
 # Optimizer
 if config.optimizer == 'sgd':

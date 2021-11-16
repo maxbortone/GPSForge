@@ -31,7 +31,6 @@ args = parser.parse_args()
 config = read_config(args.path)
 variables = restore_model(args.path)
 
-# 2D Lattice
 # 1D Lattice
 g = nk.graph.Chain(length=config.L, pbc=True)
 
