@@ -9,19 +9,13 @@ from utils import get_exact_energy, parse_range, dir_path, list_results, read_co
 
 # Parse arguments
 parser = argparse.ArgumentParser(
-    description='Compare different series of results for a model as a function of bond dimension and sample size')
+    description='Compare different series of results as a function of bond dimension and sample size')
 parser.add_argument('--L', type=int, required=True,
     help='Number of sites in the system')
 parser.add_argument('--N', type=parse_range, required=True,
     help='Range of bond dimensions')
-parser.add_argument('--J2', type=float,
-    help='Next-nearest neighbor coupling')
-parser.add_argument('--dtype', choices=['real', 'complex'],
-    help='Type of the Ansatz parameters')
-parser.add_argument('--paths', type=dir_path, nargs='+',
+parser.add_argument('--paths', type=dir_path, nargs='+', required=True,
     help='Paths to results')
-parser.add_argument('--model', default='heisenberg1d', choices=['heisenberg1d', 'j1j22d'],
-    help='Model that has been simulated (default: heisenberg1d)')
 parser.add_argument('--title', type=str,
     help='Title of the plot')
 parser.add_argument('--save', type=dir_path,
@@ -35,16 +29,11 @@ sns.set_theme(style='darkgrid')
 df = list_results(args.paths)
 df = df.loc[df['L'] == args.L]
 df = df.loc[df['N'].isin(args.N)]
-if args.dtype:
-    df = df.loc[df['dtype'] == args.dtype]
-if args.J2:
-    df = df.loc[df['J2'] == args.J2]
-df = df.reset_index()
-df = df.sort_values(by=['N', 'ansatz', 'dtype', 'msr', 'samples'], ascending=[True, True, False, True, True])
+df = df.reset_index(drop=True)
 
 # Get exact energy
 config = read_config(df['path'][0])
-exact_energy = get_exact_energy(args.model, config)
+exact_energy = get_exact_energy('heisenberg1d', config)
 
 # Extract energy estimates
 num_rows = len(df.index)
@@ -60,22 +49,26 @@ for index, row in df.iterrows():
     errors[index] = error
     rel_errors[index]= rel_error
 df = df.assign(energy=pd.Series(energies), error=pd.Series(errors), rel_error=pd.Series(rel_errors))
-print(df[['N', 'ansatz', 'dtype', 'msr', 'samples', 'energy', 'error', 'rel_error', 'uuid']].to_markdown(index=False, tablefmt='github'))
+
+# Print table
+df = df.sort_values(by=['N', 'ansatz', 'samples'], ascending=[True, True, True])
+print(df[['N', 'ansatz', 'samples', 'energy', 'error', 'rel_error', 'uuid']].to_markdown(index=False, tablefmt='github'))
 
 # Plot
-g = sns.relplot(
+f = sns.relplot(
     data=df, kind='line',
     x='N', y='rel_error',
-    hue='ansatz', style='ansatz', size='samples',
-    col='msr', row='dtype',
-    col_order=sorted(np.unique(df['msr']), reverse=True),
-    markers=True, dashes=False)
-g.set(yscale='log')
-g.tight_layout()
-if g.axes.shape == (2,2):
-    g.fig.delaxes(g.axes[0,1])
+    hue='samples', style='ansatz',
+    markers=True, dashes=False,
+    palette='tab10', markersize=10)
+f.set(xscale='log', yscale='log')
+f.tight_layout()
+f.axes[0,0].set_ylabel(r"$|E_{\theta}-E_{gs}|/|E_{gs}|$")
+f.axes[0,0].set_xticks(np.unique(df['N']))
+f.axes[0,0].set_xticklabels(np.unique(df['N']))
+# sns.move_legend(f, "upper right", bbox_to_anchor=(0.6, 0.9))
 if args.title:
-    g.set_title(args.title)
+    f.set_title(args.title)
 if args.save:
     plt.savefig(os.path.join(args.save, f"comparison_L{args.L}_N{args.N[0]}-{args.N[-1]}.png"))
 plt.show()
