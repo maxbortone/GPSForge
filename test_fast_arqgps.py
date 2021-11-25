@@ -4,12 +4,15 @@ import numpy as np
 import netket as nk
 from flax.core import freeze
 from arqgps import ARQGPS, FastARQGPS
+from initializers import gaussian
+from tqdm import tqdm
 
 
 key_in, key_model = jax.random.split(jax.random.PRNGKey(np.random.randint(0, 100)))
 L = 20
 N = 2
 B = 16
+eps_init = gaussian(scale=0.01, dtype=jnp.complex128)
 dtype = jnp.complex128
 shape = (2, N, L)
 g = nk.graph.Chain(length=L, pbc=True)
@@ -27,6 +30,7 @@ variables = fast_arqgps.init(key_model, inputs, -1, method=fast_arqgps._conditio
 p1 = arqgps.apply(variables, inputs, method=arqgps.conditionals)
 p2 = fast_arqgps.apply(variables, inputs, method=fast_arqgps.conditionals)
 
+print("Test #1")
 np.testing.assert_allclose(p2, p1)
 
 # Test #2
@@ -34,6 +38,7 @@ np.testing.assert_allclose(p2, p1)
 cache = variables['cache']
 ones = jnp.ones((B, 2, N))
 
+print("Test #2")
 np.testing.assert_allclose(cache['inputs'], ones)
 
 # Test #3
@@ -41,7 +46,7 @@ np.testing.assert_allclose(cache['inputs'], ones)
 # should give same probabilities as those computed by `ARQGPS.conditionals`
 p3 = jnp.zeros_like(p1)
 params = variables['params']
-for i in range(hi.size):
+for i in tqdm(range(hi.size), desc="Test #3"):
     variables = freeze({'params': params, 'cache': cache})
     p_i, mutables = fast_arqgps.apply(
         variables, inputs, i,

@@ -63,7 +63,6 @@ bond_operator = [
     ((J2/4)*mszsz).tolist(),
     (msr_rot*(J1/4)*exchange).tolist(),
     ((J2/4)*exchange).tolist(),
-
 ]
 bond_color = [1, 2, 1, 2]
 ha = nk.operator.GraphOperator(hilbert=hi, graph=g, bond_ops=bond_operator, bond_ops_colors=bond_color)

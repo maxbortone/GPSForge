@@ -9,7 +9,6 @@ from netket.hilbert.homogeneous import HomogeneousHilbert
 from netket.utils import HashableArray
 from netket.utils.group import PermutationGroup
 from netket.utils.types import DType, Array, NNInitFunc
-from netket.models import AbstractARNN
 from jax.nn.initializers import ones, zeros
 from initializers import gaussian
 

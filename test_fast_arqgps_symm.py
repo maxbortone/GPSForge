@@ -12,8 +12,8 @@ from autoreg import ARDirectSampler
 from initializers import gaussian
 
 
-key = jax.random.PRNGKey(np.random.randint(0, 100))
-L = 8
+key_in, key_model = jax.random.split(jax.random.PRNGKey(np.random.randint(0, 100)))
+L = 16
 N = 2
 B = 16
 eps_init = gaussian(scale=0.01, dtype=jnp.complex128)
@@ -23,8 +23,8 @@ hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes)
 symmetries = g.automorphisms()
 arqgps = FastARQGPS(hilbert=hi, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
 arqgps_symm = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
-inputs = hi.random_state(key, B)
-variables = arqgps_symm.init(key, inputs)
+inputs = hi.random_state(key_in, B)
+variables = arqgps_symm.init(key_model, inputs)
 
 # Test #1
 # Symmetrized amplitudes should be equal to average of
@@ -42,7 +42,7 @@ log_psi_real = 0.5*logsumexp(2*log_psi.real, axis=0, b=1/T)
 log_psi_imag = logsumexp(1j*log_psi.imag, axis=0).imag
 log_psi = log_psi_real+1j*log_psi_imag
 
-np.testing.assert_allclose(log_psi_symm, log_psi)
+np.testing.assert_allclose(log_psi_symm.real, log_psi.real)
 
 
 # Test #2
@@ -59,8 +59,8 @@ np.testing.assert_allclose(psi_cond_test, psi_cond)
 hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes, total_sz=0)
 symmetries = g.automorphisms()
 arqgps_symm = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
-inputs = hi.random_state(key, B)
-variables = arqgps_symm.init(key, inputs)
+inputs = hi.random_state(key_in, B)
+variables = arqgps_symm.init(key_model, inputs)
 psi_cond_test = jnp.zeros((B, L, 2), dtype=jnp.float64)
 for l in tqdm(range(L), desc="Test #2, constrained"):
     p, variables = arqgps_symm.apply(variables, inputs, l, method=FastARQGPSSymm._conditional, mutable=True)
@@ -73,6 +73,13 @@ np.testing.assert_allclose(psi_cond_test, psi_cond)
 # Test #3
 # Load optimized Ansatz
 # TODO: replace path with a test model
+L = 8
+N = 2
+B = 16
+g = nk.graph.Chain(length=L, pbc=True)
+hi = nk.hilbert.Spin(s=1/2, N=g.n_nodes)
+symmetries = g.automorphisms()
+arqgps_symm = FastARQGPSSymm(hilbert=hi, symmetries=symmetries, N=N, L=L, B=B, eps_init=eps_init, dtype=jnp.complex128)
 path = "./results/tests/fast_arqgps_symm_sampling/fe1185fc89e349c6b0f8b2886513685f"
 params = restore_model(path)
 variables = unfreeze(variables)
