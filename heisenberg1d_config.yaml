@@ -4,8 +4,9 @@ scale: 0.001
 maxval: 0.1
 ansatz: arqgps-fast
 dtype: real
+sampler: ar-direct
 samples: 1000
 iterations: 100
-optimizer: 'sgd-sr-dense'
+optimizer: sgd-sr-dense
 learning-rate: 0.01
 diagonal-shift: 0.01

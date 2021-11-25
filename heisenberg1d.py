@@ -49,6 +49,9 @@ parser.add_argument('--dtype', default='real', choices=['real', 'complex'],
     help='Type of the Ansatz parameters (default: real')
 parser.add_argument('--constrained', type=bool, default=False,
     help='Whether to constrain the Hilbert space to the zero magnetization sector (default: False)')
+parser.add_argument('--sampler', default='metropolis-exchange',
+    choices=['metropolis-exchange', 'ar-direct'],
+    help='Sampler used in VMC (default: metropolis-exchange)')
 parser.add_argument('--samples', type=int, default=1000,
     help='Number of samples used in VMC (default: 1000)')
 parser.add_argument('--discard', type=int, default=100,
@@ -158,11 +161,12 @@ elif config.ansatz == 'arnn-conv1d':
     )
 
 # Sampler
-if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
-    sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
-elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
-    sa = nk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
-else:
+if config.sampler == 'ar-direct':
+    if config.ansatz in ['arqgps', 'arqgps-fast', 'arqgps-fast-symm']:
+        sa = ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+    elif config.ansatz in ['arnn-dense', 'arnn-conv1d', 'arnn-conv2d']:
+        sa = nk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
+elif config.sampler == 'metropolis-exchange':
     sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
 
 # Variational state
