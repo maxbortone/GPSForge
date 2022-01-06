@@ -49,12 +49,8 @@ def train():
 
     if args.compare_to_ed:
         # Get converged energy estimate
-        if args.save_checkpoint_dir:
-            data = json.load(open(prefix+".log"))
-            estimated_energy = np.mean(data["Energy"]["Mean"]["real"][-10:])
-        else:
-            data = logger.data
-            estimated_energy = np.mean(data["Energy"]["Mean"][-10:].real)
+        data = logger.data
+        estimated_energy = np.mean(data["Energy"]["Mean"][-10:].real)
 
         # Get exact energy
         exact_energy = get_exact_energy(config)

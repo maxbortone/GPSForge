@@ -19,12 +19,8 @@ def test():
         path = select_checkpoint(args.load_checkpoint_dir, args.load_checkpoint)
     config = read_config(path)
 
-    # Setup Hamiltonian, optimizer and variational state
-    ha, _, vs = setup_vmc(config)
-
     # Load checkpoint
     variables = restore_model(path)
-    vs.variables = variables
 
     # Test energy evaluation
     if MPIVars.rank == 0:
@@ -32,7 +28,9 @@ def test():
     with tqdm(total=len(args.test_sample_sizes)) as pbar:
         it = 1
         for n_samples in args.test_sample_sizes:
-            vs.n_samples = n_samples
+            config.samples = n_samples
+            ha, _, vs = setup_vmc(config)
+            vs.variables = variables
             stats = vs.expect(ha)
             energy = stats.mean.item()
             pbar.set_postfix_str(f"n_samples = {n_samples}, energy = {energy.real}")
