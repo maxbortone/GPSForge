@@ -29,6 +29,11 @@ def train():
         variables = restore_model(path)
         vs.variables = variables
 
+    # Set chunk size
+    if args.set_chunk_size:
+        chunk_size = int(2**(np.ceil(np.log2(vs.n_samples_per_rank*ha.hilbert.size))))
+        vs.chunk_size = chunk_size
+
     # Variational Monte Carlo driver
     vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 

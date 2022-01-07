@@ -107,14 +107,22 @@ def create_parser(description):
              "best" pick checkpoint with best energy, \
              "last" pick last checkpoint.')
 
-    # Misc
+    # Flags
+    parser.add_argument('--set-chunk-size', action='store_true',
+        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size)))')
     parser.add_argument('--compare-to-ed', action='store_true',
-        help='Compare energy estimate to exact diagonalisation result (default: False)')
+        help='Compare energy estimate to exact diagonalisation result')
 
     return parser
 
 def create_test_parser(description):
     parser = configargparse.ArgumentParser(description=description)
+
+    # Testing
+    parser.add_argument('--sample-sizes', type=int_or_iterable,
+        help='Sample sizes on which to test the Ansatz')
+
+    # Checkpointing
     parser.add_argument('--load-checkpoint-dir', type=dir_path,
         help='Directory from which checkpoints are loaded')
     parser.add_argument('--load-checkpoint', type=str, default='best',
@@ -122,9 +130,11 @@ def create_test_parser(description):
              "{uuid}" pick checkpoint at load_checkpoint_dir/{uuid}, \
              "best" pick checkpoint with best energy, \
              "last" pick last checkpoint.')
-    parser.add_argument('--test-sample-sizes', type=int_or_iterable,
-        help='Sample sizes on which to test the Ansatz')
+
+    # Flags
+    parser.add_argument('--set-chunk-size', action='store_true',
+        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size)))')
     parser.add_argument('--save', action='store_true',
-        help='Whether to save the test outcome or not; if True saves to same directory as checkpoint (default: False)')
+        help='Whether to save the test outcome or not; if True saves to same directory as checkpoint')
 
     return parser

@@ -32,6 +32,9 @@ def test():
     for step, n_samples in enumerate(args.test_sample_sizes):
         config.samples = n_samples
         ha, _, vs = setup_vmc(config)
+        if args.set_chunk_size:
+            chunk_size = int(2**(np.ceil(np.log2(vs.n_samples_per_rank*ha.hilbert.size))))
+            vs.chunk_size = chunk_size
         vs.variables = variables
         stats = vs.expect(ha)
         if MPIVars.rank == 0:
