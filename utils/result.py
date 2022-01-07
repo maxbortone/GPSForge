@@ -52,8 +52,10 @@ def select_checkpoint(path, strategy_or_uuid):
     elif isinstance(strategy_or_uuid, str):
         if os.path.isdir(os.path.join(path, strategy_or_uuid)):
             result = os.path.join(path, strategy_or_uuid)
+        else:
+            raise ValueError(f"Checkpoint {strategy_or_uuid} does not exist at {path}")
     else:
-        result = None
+        raise ValueError("Provide a valid strategy or checkpoint id")
     return result
 
 def restore_model(path, filename='output'):
