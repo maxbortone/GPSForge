@@ -107,9 +107,13 @@ def create_parser(description):
              "best" pick checkpoint with best energy, \
              "last" pick last checkpoint.')
 
-    # Flags
+    # Chunking
+    parser.add_argument('--chunk-size-multiplier', type=float, default=1.0,
+        help='Multiplier for the chunk size calculation (default: 1.0)')
     parser.add_argument('--set-chunk-size', action='store_true',
-        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size)))')
+        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size*multiplier)))')
+    
+    # Exact diagonalisation
     parser.add_argument('--compare-to-ed', action='store_true',
         help='Compare energy estimate to exact diagonalisation result')
 
@@ -130,11 +134,13 @@ def create_test_parser(description):
              "{uuid}" pick checkpoint at load_checkpoint_dir/{uuid}, \
              "best" pick checkpoint with best energy, \
              "last" pick last checkpoint.')
-
-    # Flags
-    parser.add_argument('--set-chunk-size', action='store_true',
-        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size)))')
     parser.add_argument('--save', action='store_true',
         help='Whether to save the test outcome or not; if True saves to same directory as checkpoint')
+
+    # Chunking
+    parser.add_argument('--chunk-size-multiplier', type=float, default=1.0,
+        help='Multiplier for the chunk size calculation (default: 1.0)')
+    parser.add_argument('--set-chunk-size', action='store_true',
+        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size*multiplier)))')
 
     return parser

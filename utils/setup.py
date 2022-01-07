@@ -1,3 +1,4 @@
+import numpy as np
 import jax.numpy as jnp
 import netket as nk
 import qGPSKet as qk
@@ -14,6 +15,13 @@ class MPIVariables:
     n_nodes : int = comm.Get_size()
 
 MPIVars = MPIVariables()
+
+def compute_chunk_size(multiplier, n_samples, size):
+    if multiplier > 0:
+        chunk_size = int(2**(np.ceil(np.log2(n_samples*size*multiplier))))
+    else:
+        raise ValueError("Chunk size multiplier needs to be > 0.0")
+    return chunk_size
 
 def setup_vmc(config):
     # System

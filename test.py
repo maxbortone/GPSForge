@@ -4,7 +4,7 @@ import numpy as np
 from utils import create_test_parser
 from utils import select_checkpoint
 from utils import read_config
-from utils import MPIVars, setup_vmc
+from utils import MPIVars, setup_vmc, compute_chunk_size
 from utils import restore_model
 from utils import Timer
 
@@ -33,8 +33,7 @@ def test():
         config.samples = n_samples
         ha, _, vs = setup_vmc(config)
         if args.set_chunk_size:
-            chunk_size = int(2**(np.ceil(np.log2(vs.n_samples_per_rank*ha.hilbert.size))))
-            vs.chunk_size = chunk_size
+            vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
         vs.variables = variables
         stats = vs.expect(ha)
         if MPIVars.rank == 0:

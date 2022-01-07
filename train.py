@@ -1,11 +1,10 @@
-import json
 import os
 import netket as nk
 import numpy as np
 from scipy.sparse.linalg import eigsh
 from utils import create_parser
 from utils import initialize_config, save_config
-from utils import MPIVars, setup_vmc
+from utils import MPIVars, setup_vmc, compute_chunk_size
 from utils import create_result
 from utils import get_exact_energy
 from utils import restore_model, select_checkpoint
@@ -31,8 +30,7 @@ def train():
 
     # Set chunk size
     if args.set_chunk_size:
-        chunk_size = int(2**(np.ceil(np.log2(vs.n_samples_per_rank*ha.hilbert.size))))
-        vs.chunk_size = chunk_size
+        vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
 
     # Variational Monte Carlo driver
     vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
