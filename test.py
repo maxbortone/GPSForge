@@ -1,12 +1,12 @@
 import os
 import json
 import numpy as np
-from tqdm import tqdm
 from utils import create_test_parser
 from utils import select_checkpoint
 from utils import read_config
 from utils import MPIVars, setup_vmc
 from utils import restore_model
+from utils import Timer
 
 
 def test():
@@ -24,22 +24,23 @@ def test():
 
     # Test energy evaluation
     if MPIVars.rank == 0:
+        print(f"Running test for: \n{config}")
+        print("Iteration\t Number of samples\t\t Energy statistics")
         output = {}
-    with tqdm(total=len(args.test_sample_sizes)) as pbar:
-        it = 1
-        for n_samples in args.test_sample_sizes:
-            config.samples = n_samples
-            ha, _, vs = setup_vmc(config)
-            vs.variables = variables
-            stats = vs.expect(ha)
+        n_sample_sizes = len(args.test_sample_sizes)
+        t = Timer(n_sample_sizes)
+    for step, n_samples in enumerate(args.test_sample_sizes):
+        config.samples = n_samples
+        ha, _, vs = setup_vmc(config)
+        vs.variables = variables
+        stats = vs.expect(ha)
+        if MPIVars.rank == 0:
+            output[n_samples] = stats.to_dict()
             energy = stats.mean.item()
-            pbar.set_postfix_str(f"n_samples = {n_samples}, energy = {energy.real}")
-            pbar.update(it)
-            it += 1
-            if MPIVars.rank == 0:
-                output[n_samples] = stats.to_dict()
-                if np.iscomplex(energy):
-                    output[n_samples]['Mean'] = {'real': energy.real, 'imag': energy.imag}
+            if np.iscomplex(energy):
+                output[n_samples]['Mean'] = {'real': energy.real, 'imag': energy.imag}
+            t.update(step+1)
+            print(f"[{step+1}/{n_sample_sizes}] n_samples: {vs.n_samples}, E: {stats} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]")
 
     # Save
     if args.save and MPIVars.rank == 0:

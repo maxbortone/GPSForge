@@ -9,6 +9,7 @@ from utils import MPIVars, setup_vmc
 from utils import create_result
 from utils import get_exact_energy
 from utils import restore_model, select_checkpoint
+from utils import Timer
 
 
 def train():
@@ -31,7 +32,7 @@ def train():
     # Variational Monte Carlo driver
     vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
-    # Run optimization
+    # Logger
     if args.save_checkpoint_dir and os.path.isdir(args.save_checkpoint_dir):
         if MPIVars.rank == 0:
             path = create_result(args.save_checkpoint_dir)
@@ -41,12 +42,24 @@ def train():
             path = None
         path = MPIVars.comm.bcast(path, root=0)
         prefix = os.path.join(path, "output")
-        logger = nk.logging.JsonLog(prefix)
-        vmc.run(n_iter=config.iterations, out=logger, save_params_every=args.checkpoint_every, write_every=args.checkpoint_every)
+        logger = nk.logging.JsonLog(prefix, save_params_every=args.checkpoint_every, write_every=args.checkpoint_every)
     else:
         logger = nk.logging.RuntimeLog()
-        vmc.run(n_iter=config.iterations, out=logger)
 
+    # Run optimization
+    if MPIVars.rank == 0:
+        print(f"Running optimisation for: \n{config}")
+        print("Iteration\t Energy statistics\t\t Gradient norm")
+        t = Timer(config.iterations)
+    for step in vmc.iter(config.iterations):
+        logger(step, {"Energy": vmc._loss_stats}, vmc.state)
+        if MPIVars.rank == 0:
+            grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
+            grad_norm = np.linalg.norm(grad)
+            t.update(step+1)
+            print(f"[{step+1}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]")
+
+    # Comparison with exact result
     if args.compare_to_ed:
         # Get converged energy estimate
         data = logger.data
