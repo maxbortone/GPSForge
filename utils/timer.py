@@ -15,14 +15,14 @@ class Timer:
 
     def update(self, step : int):
         now = timer()
-        self._elapsed_time = convert_timedelta(now-self._start)
+        self._elapsed_time = timedelta(seconds=now-self._start)
         self._runtime = timedelta(seconds=now-self._prev)
-        self._remaining_time = convert_timedelta((self._runtime*(self._total_steps-step)).total_seconds())
+        self._remaining_time = self._runtime*(self._total_steps-step)
         self._prev = now
 
     @property
     def elapsed_time(self) -> str:
-        return self._elapsed_time.strftime('%H:%M:%S')
+        return strftimedelta(self._elapsed_time)
 
     @property
     def runtime(self) -> float:
@@ -30,14 +30,16 @@ class Timer:
 
     @property
     def remaining_time(self) -> str:
-        return self._remaining_time.strftime('%H:%M:%S')
+        return strftimedelta(self._remaining_time)
 
 
-def convert_timedelta(duration : float) -> time:
-    delta = timedelta(seconds=duration)
+def strftimedelta(delta):
     days, seconds = delta.days, delta.seconds
-    hours = days * 24 + seconds // 3600
+    hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = (seconds % 60)
-    t = time(hour=hours, minute=minutes, second=seconds)
-    return t
+    s = ""
+    if days > 0:
+        s += f"{days}d "
+    s += f"{hours}:{minutes}:{seconds}"
+    return s
