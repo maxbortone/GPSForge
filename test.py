@@ -27,9 +27,9 @@ def test():
         print(f"Running test for: \n{config}")
         print("Iteration\t Number of samples\t\t Energy statistics")
         output = {}
-        n_sample_sizes = len(args.test_sample_sizes)
+        n_sample_sizes = len(args.sample_sizes)
         t = Timer(n_sample_sizes)
-    for step, n_samples in enumerate(args.test_sample_sizes):
+    for step, n_samples in enumerate(args.sample_sizes):
         config.samples = n_samples
         ha, _, vs = setup_vmc(config)
         if args.set_chunk_size:
