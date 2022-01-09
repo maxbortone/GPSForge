@@ -43,6 +43,11 @@ def unpack_result(path, filename='output'):
     }
     return data
 
+def unpack_test_result(path, filename="test"):
+    with open(os.path.join(path, f"{filename}.json"), "r") as f:
+        result = json.load(f)
+    return result
+
 def select_checkpoint(path, strategy_or_uuid):
     # TODO: implement strategies
     if strategy_or_uuid == "best":
