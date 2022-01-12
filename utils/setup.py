@@ -71,7 +71,7 @@ def setup_vmc(config):
     if config.sampler == 'ar-direct' and config.ansatz == 'arqgps':
         sa = qk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
     elif config.sampler == 'metropolis-exchange':
-        sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains)
+        sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains, n_sweeps=config.sweeps)
 
     # Variational state
     if sa.is_exact:

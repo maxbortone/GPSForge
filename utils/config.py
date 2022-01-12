@@ -1,5 +1,4 @@
 import os
-from jax._src.api import checkpoint
 import yaml
 import configargparse
 import dataclasses
@@ -27,6 +26,7 @@ class Config:
     samples : int = 1000
     discard : int = 100
     chains : int = 1
+    sweeps : int = None
 
     # Optimizer
     iterations : int = 100
@@ -71,6 +71,7 @@ def initialize_config(args : configargparse.ArgumentParser) -> Config:
     if args.sampler == 'metropolis-exchange':
         config.discard = args.discard
         config.chains = args.chains
+        config.sweeps = args.sweeps
     else:
         config.discard = None
         config.chains = None

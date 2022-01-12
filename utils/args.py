@@ -76,6 +76,8 @@ def create_parser(description):
         help='Number of samples discarded during VMC (default: 100)')
     parser.add_argument('--chains', type=int, default=1,
         help='Number of chains used in VMC (default: 1)')
+    parser.add_argument('--sweeps', type=int, default=None,
+        help='Number of sweeps used in MCMC sampler (default: None -> Hilbert size)')
 
     # Optimizer
     parser.add_argument('--iterations', type=int, default=100,

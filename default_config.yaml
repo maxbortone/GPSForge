@@ -7,6 +7,7 @@ ansatz: qgps
 b1: null
 b2: null
 chains: 1
+sweeps: null
 constrained: false
 diagonal-shift: 0.01
 discard: 100
