@@ -48,6 +48,7 @@ def test():
             local_energies[MPIVars.rank*vs.n_samples_per_rank:(MPIVars.rank+1)*vs.n_samples_per_rank] = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args)
         local_energies, _ = nk.utils.mpi.mpi_sum_jax(local_energies)
         if MPIVars.rank == 0:
+            local_energies = np.array(local_energies)
             output[n_samples]['local_energies'] = {'real': local_energies.real.tolist(), 'imag': local_energies.imag.tolist()}
             energy = np.mean(local_energies)
             if np.iscomplex(energy):
