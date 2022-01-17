@@ -33,15 +33,18 @@ def test():
     for step, n_samples in enumerate(args.sample_sizes):
         config.samples = n_samples
         ha, _, vs = setup_vmc(config)
-        if args.set_chunk_size:
-            vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
         vs.variables = variables
         σ, kernel_args = nk.vqs.get_local_kernel_arguments(vs, ha)
-        local_estimator_fun = nk.vqs.get_local_kernel(vs, ha)
+        σ = σ.reshape((-1, σ.shape[-1]))
         def logpsi(w, σ):
             return vs._apply_fun({"params": w, **vs._model_state}, σ)
-        σ = σ.reshape((-1, σ.shape[-1]))
-        local_energies = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args)
+        if args.set_chunk_size:
+            vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
+            local_estimator_fun = nk.vqs.get_local_kernel(vs, ha, vs.chunk_size)
+            local_energies = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args, chunk_size=vs.chunk_size)
+        else:
+            local_estimator_fun = nk.vqs.get_local_kernel(vs, ha)
+            local_energies = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args)
         local_energies = np.array(local_energies)
         if MPIVars.rank == 0:
             output[n_samples]['local_energies'] = {'real': local_energies.real.tolist(), 'imag': local_energies.imag.tolist()}
@@ -53,7 +56,7 @@ def test():
 
     # Save
     if args.save and MPIVars.rank == 0:
-        with open(os.path.join(path, "test.json"), "w") as f:
+        with open(os.path.join(path, "test_local_energies.json"), "w") as f:
             json.dump(output, f)
 
 
