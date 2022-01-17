@@ -25,7 +25,11 @@ def compute_chunk_size(multiplier, n_samples, size):
 
 def setup_vmc(config):
     # System
-    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(config.Lx, Ly=config.Ly, J1=config.J1, J2=config.J2, sign_rule=config.sign_rule)
+    if config.constrained:
+        total_sz = 0.
+    else:
+        total_sz = None
+    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(config.Lx, Ly=config.Ly, J1=config.J1, J2=config.J2, sign_rule=config.sign_rule, total_sz=total_sz)
     hi = ha.hilbert
     g = ha.graph
 
@@ -72,6 +76,8 @@ def setup_vmc(config):
         sa = qk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
     elif config.sampler == 'metropolis-exchange':
         sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains, n_sweeps=config.sweeps)
+    elif config.sampler == 'metropolis-local':
+        sa = nk.sampler.MetropolisLocal(hi, n_chains_per_rank=config.chains, n_sweeps=config.sweeps)
 
     # Variational state
     if sa.is_exact:
