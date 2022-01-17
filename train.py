@@ -1,4 +1,5 @@
 import os
+import jax; jax.config.update('jax_platform_name', 'cpu')
 import netket as nk
 import numpy as np
 from scipy.sparse.linalg import eigsh

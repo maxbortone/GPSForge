@@ -1,5 +1,6 @@
 import os
 import json
+import jax; jax.config.update('jax_platform_name', 'cpu')
 import numpy as np
 import netket as nk
 from utils import create_test_parser

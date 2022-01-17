@@ -1,5 +1,6 @@
 import os
 import json
+import jax; jax.config.update('jax_platform_name', 'cpu')
 import numpy as np
 from utils import create_test_parser
 from utils import select_checkpoint
