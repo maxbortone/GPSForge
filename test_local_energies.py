@@ -41,15 +41,18 @@ def test():
         if args.set_chunk_size:
             vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
             local_estimator_fun = nk.vqs.get_local_kernel(vs, ha, vs.chunk_size)
-            local_energies[MPIVars.rank*vs.n_samples_per_rank:(MPIVars.rank+1)*vs.n_samples_per_rank] = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args, chunk_size=vs.chunk_size)
+            local_energies = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args, chunk_size=vs.chunk_size)
         else:
             local_estimator_fun = nk.vqs.get_local_kernel(vs, ha)
-            local_energies[MPIVars.rank*vs.n_samples_per_rank:(MPIVars.rank+1)*vs.n_samples_per_rank] = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args)
-        local_energies, _ = nk.utils.mpi.mpi_sum_jax(local_energies)
+            local_energies = local_estimator_fun(logpsi, vs.parameters, σ, kernel_args)
+        local_energies, token = nk.utils.mpi.mpi_allgather_jax(local_energies)
+        σ, _ = nk.utils.mpi.mpi_allgather_jax(σ, token=token)
         if MPIVars.rank == 0:
-            local_energies = np.array(local_energies)
+            local_energies = np.array(local_energies.flatten())
             output = {}
             output['local_energies'] = {'real': local_energies.real.tolist(), 'imag': local_energies.imag.tolist()}
+            σ = np.array(σ.reshape((-1, σ.shape[-1])))
+            output['samples'] = σ.tolist()
             energy = np.mean(local_energies)
             output['mean'] = {'real': energy.real, 'imag': energy.imag}
             t.update(step+1)
