@@ -27,7 +27,6 @@ def test():
     if MPIVars.rank == 0:
         print(f"Running test for: \n{config}")
         print("Iteration\t Number of samples\t\t Energy statistics")
-        output = {n_samples: {} for n_samples in args.sample_sizes}
         n_sample_sizes = len(args.sample_sizes)
         t = Timer(n_sample_sizes)
     for step, n_samples in enumerate(args.sample_sizes):
@@ -49,17 +48,17 @@ def test():
         local_energies, _ = nk.utils.mpi.mpi_sum_jax(local_energies)
         if MPIVars.rank == 0:
             local_energies = np.array(local_energies)
-            output[n_samples]['local_energies'] = {'real': local_energies.real.tolist(), 'imag': local_energies.imag.tolist()}
+            output = {}
+            output['local_energies'] = {'real': local_energies.real.tolist(), 'imag': local_energies.imag.tolist()}
             energy = np.mean(local_energies)
-            if np.iscomplex(energy):
-                output[n_samples]['mean'] = {'real': energy.real, 'imag': energy.imag}
+            output['mean'] = {'real': energy.real, 'imag': energy.imag}
             t.update(step+1)
             print(f"[{step+1}/{n_sample_sizes}] n_samples: {vs.n_samples}, E: {energy.real} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]")
 
-    # Save
-    if args.save and MPIVars.rank == 0:
-        with open(os.path.join(path, "test_local_energies.json"), "w") as f:
-            json.dump(output, f)
+        # Save
+        if args.save and MPIVars.rank == 0:
+            with open(os.path.join(path, f"test_local_energies_samples_{n_samples}.json"), "w") as f:
+                json.dump(output, f)
 
 
 if __name__ == '__main__':
