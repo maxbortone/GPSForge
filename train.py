@@ -61,7 +61,7 @@ def train():
             grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
             grad_norm = np.linalg.norm(grad)
             t.update(step+1)
-            print(f"[{step+1}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]")
+            print(f"[{step+1}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]", flush=True)
 
     # Comparison with exact result
     if args.compare_to_ed:
@@ -76,7 +76,7 @@ def train():
         if MPIVars.rank == 0:
             print(f"\nEstimated energy:\t{estimated_energy}")
             print(f"Exact energy:\t\t{exact_energy}")
-            print(f"Relative error:\t\t{abs((estimated_energy-exact_energy)/exact_energy)}")
+            print(f"Relative error:\t\t{abs((estimated_energy-exact_energy)/exact_energy)}", flush=True)
 
 
 if __name__ == '__main__':

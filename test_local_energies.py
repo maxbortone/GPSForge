@@ -25,6 +25,8 @@ def test():
     variables = restore_model(path)
 
     # Test energy evaluation
+    if isinstance(args.sample_sizes, int):
+        args.sample_sizes = [args.sample_sizes]
     if MPIVars.rank == 0:
         print(f"Running test for: \n{config}")
         print("Iteration\t Number of samples\t\t Energy statistics")
