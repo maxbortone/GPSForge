@@ -20,7 +20,7 @@ def int_or_iterable(string):
 def bool_or_iterable(string):
     vals = string.split(',')
     if len(vals)>1:
-        l = tuple([bool(v) for v in vals])
+        l = tuple([v == 'true' for v in vals])
     else:
         l = bool(vals[0])
     return l
