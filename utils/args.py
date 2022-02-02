@@ -17,6 +17,14 @@ def int_or_iterable(string):
         l = int(vals[0])
     return l
 
+def bool_or_iterable(string):
+    vals = string.split(',')
+    if len(vals)>1:
+        l = tuple([bool(v) for v in vals])
+    else:
+        l = bool(vals[0])
+    return l
+
 def range(string):
     m = re.match(r'(\d+)(?:-(\d+))?$', string)
     # ^ (or use .split('-'). anyway you like.)
@@ -44,7 +52,7 @@ def create_parser(description):
         help='Next-nearest neighbor coupling (default: 0.0)')
     parser.add_argument('--constrained', type=bool, default=False,
         help='Whether to constrain the Hilbert space to the zero magnetization sector (default: False)')
-    parser.add_argument('--sign-rule', type=bool, default=True,
+    parser.add_argument('--sign-rule', type=bool_or_iterable, default=True,
         help='Whether to apply the Marshal Sign Rule or not (default: True)')
     
     # Ansatz
