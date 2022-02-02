@@ -39,7 +39,7 @@ def setup_vmc(config):
     elif config.dtype == 'complex':
         dtype = jnp.complex128
     init_fun = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
-    to_indices = lambda x: jnp.asarray((x+hi.local_size-1)/hi.local_size, jnp.int8)
+    to_indices = lambda x: jnp.asarray((x+hi.local_size-1)/2, jnp.int8)
     if isinstance(hi, nk.hilbert.Spin):
         if config.symmetries == 'all':
             automorphisms = True
@@ -53,18 +53,37 @@ def setup_vmc(config):
         elif config.symmetries == 'spin-flip':
             automorphisms = False
             spin_flip = True
-        symmetries, inv_symmetries = qk.models.get_sym_transformation_spin(g, automorphisms=automorphisms, spin_flip=spin_flip)
     if config.ansatz == 'qgps':
+        symmetries, inv_symmetries = qk.models.get_sym_transformation_spin(g, automorphisms=automorphisms, spin_flip=spin_flip)
         ma = qk.models.qGPS(
             hi, config.M,
             dtype=dtype, init_fun=init_fun,
             to_indices=to_indices, syms=(symmetries, inv_symmetries))
     elif config.ansatz == 'arqgps':
+        symmetries = g.automorphisms().to_array().T
+        if automorphisms and spin_flip:
+            def apply_symmetries(samples):
+                out = jnp.take(samples, symmetries, axis=-1)
+                out = jnp.concatenate((out, -out), axis=-1)
+                return out
+        elif automorphisms:
+            def apply_symmetries(samples):
+                out = jnp.take(samples, symmetries, axis=-1)
+                return out
+        elif spin_flip:
+            def apply_symmetries(samples):
+                out = jnp.expand_dims(samples, axis=-1)
+                out = jnp.concatenate((out, -out), axis=-1)
+                return out
+        else:
+            def apply_symmetries(samples):
+                out = jnp.expand_dims(samples, axis=-1)
+                return out
         ma = qk.models.ARqGPS(
             hi, config.M,
             dtype=dtype, init_fun=init_fun,
             to_indices=to_indices,
-            apply_symmetries=symmetries)
+            apply_symmetries=apply_symmetries)
 
     # Compute samples per rank
     if config.samples % MPIVars.n_nodes != 0:
