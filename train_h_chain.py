@@ -6,7 +6,7 @@ import netket as nk
 import qGPSKet as qk
 import numpy as np
 import jax.numpy as jnp
-from pyscf import scf, gto, ao2mo, fci
+from pyscf import scf, gto, ao2mo, fci, lo
 from utils import dir_path, save_config
 from utils import MPIVars, compute_chunk_size
 from utils import create_result
@@ -20,6 +20,7 @@ class Config:
     # System
     n_atoms : int = 10
     dist : float = 1.8
+    basis : str = 'canonical'
 
     # Ansatz
     M : int = 1
@@ -38,6 +39,7 @@ def initialize_config(args):
     config = Config()
     config.n_atoms = args.n_atoms
     config.dist = args.dist
+    config.basis = args.basis
     config.M = args.M
     config.sigma = args.sigma
     config.samples = args.samples
@@ -61,6 +63,8 @@ def train():
         help='Number of atoms (default: 10)')
     parser.add_argument('--dist', type=float, default=1.8,
         help='Distance between atoms in Bohr units (default: 1.8)')
+    parser.add_argument('--basis', type=str, default='canonical',
+        help='Basis used to represent configurations (default: canonical)')
     
     # Ansatz
     parser.add_argument('--M', type=int, default=1,
@@ -142,6 +146,18 @@ def train():
     # Setup Hamiltonian
     ha = qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly(hi, h1, h2, use_fast_update=False)
 
+    # Transform to a local orbital basis if wanted
+    if config.basis == 'local':
+        loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
+        ovlp = myhf.get_ovlp()
+        # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
+        assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
+        # Find the hamiltonian in the local basis
+        hij_local = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
+        hijkl_local = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
+        h1 = hij_local
+        h2 = hijkl_local
+
     # Setup Ansatz
     dtype = jnp.complex128
     init_fun = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
@@ -181,8 +197,6 @@ def train():
             log_psi
         )
         return log_psi
-    # count_spins = lambda spins: jnp.zeros((spins.shape[0], 4), jnp.int32)
-    # renormalize_log_psi = lambda n_spins, hilbert, index: jnp.zeros((n_spins.shape[0], 4), jnp.complex128)
     ma = qk.models.ARqGPS(
         hi, config.M, dtype=dtype,
         init_fun=init_fun,
