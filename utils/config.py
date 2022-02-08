@@ -108,7 +108,7 @@ def save_config(config : Config, path : str):
     with open(os.path.join(path, "config.yaml"), "w") as f:
         yaml.safe_dump(config_copy, f, default_flow_style=False, allow_unicode=True)
 
-def read_config(path : str) -> Config:
+def read_config(path : str, config_class=Config) -> Config:
     if not os.path.isdir(path):
         raise ValueError("The provided config path does not exist")
     config_path = os.path.join(path, "config.yaml")
@@ -122,5 +122,5 @@ def read_config(path : str) -> Config:
             config_copy[key.replace('-', '_')] = value
         else:
             config_copy[key] = value
-    config = Config(**config_copy)
+    config = config_class(**config_copy)
     return config

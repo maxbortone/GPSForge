@@ -5,7 +5,8 @@ import json
 import numpy as np
 import pandas as pd
 from flax.serialization import msgpack_restore
-from .config import read_config
+from dataclasses import asdict
+from .config import Config, read_config
 
 
 def create_result(path):
@@ -15,8 +16,8 @@ def create_result(path):
         os.makedirs(result_path)
     return result_path
 
-def unpack_result(path, filename='output'):
-    config = read_config(path)
+def unpack_result(path, filename='output', config_class=Config):
+    config = read_config(path, config_class=config_class)
     with open(os.path.join(path, f"{filename}.log"), "r") as f:
         result = json.load(f)
     iters = np.array(result['Energy']['iters'])
@@ -68,7 +69,7 @@ def restore_model(path, filename='output'):
         variables = msgpack_restore(b.read())
     return variables
 
-def list_results(paths):
+def list_results(paths, sort_by=['L', 'N'], config_class=Config):
     if isinstance(paths, str):
         results = [os.path.join(paths, result) for result in os.listdir(paths)]
     elif isinstance(paths, list):
@@ -78,11 +79,11 @@ def list_results(paths):
                 results.append(os.path.join(path, result))
     configs = []
     for result in results:
-        config = vars(read_config(result))
+        config = asdict(read_config(result, config_class=config_class))
         config['path'] = result
         config['uuid'] = os.path.basename(result)
         configs.append(config)
     df = pd.DataFrame(configs)
-    df = df.sort_values(['L', 'N'])
+    df = df.sort_values(sort_by)
     df = df.reset_index(drop=True)
     return df
