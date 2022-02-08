@@ -49,6 +49,119 @@ def initialize_config(args):
     config.sr_iterative = args.sr_iterative
     return config
 
+def setup_vmc(config):
+    # Setup Hilbert space
+    mol = gto.Mole()
+    mol.build(
+        atom = [('H', (x, 0., 0.)) for x in config.dist*np.arange(config.n_atoms)],
+        basis = 'sto-6g',
+        symmetry = True,
+        unit="Bohr"
+    )
+    nelec = mol.nelectron
+    print('Number of electrons: ', nelec)
+
+    myhf = scf.RHF(mol)
+    ehf = myhf.scf()
+    norb = myhf.mo_coeff.shape[1]
+    print('Number of molecular orbitals: ', norb)
+
+    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=(nelec//2,nelec//2))
+
+    # Get hamiltonian elements
+    # 1-electron 'core' hamiltonian terms, transformed into MO basis
+    h1 = np.linalg.multi_dot((myhf.mo_coeff.T, myhf.get_hcore(), myhf.mo_coeff))
+
+    # Get 2-electron electron repulsion integrals, transformed into MO basis
+    eri = ao2mo.incore.general(myhf._eri, (myhf.mo_coeff,)*4, compact=False)
+
+    # Previous representation exploited permutational symmetry in storage. Change this to a 4D array.
+    # Integrals now stored as h2[p,q,r,s] = (pq|rs) = <pr|qs>. Note 8-fold permutational symmetry.
+    h2 = ao2mo.restore(1, eri, norb)
+
+    # Transform to a local orbital basis if wanted
+    if config.basis == 'local':
+        loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
+        ovlp = myhf.get_ovlp()
+        # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
+        assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
+        # Find the hamiltonian in the local basis
+        hij_local = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
+        hijkl_local = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
+        h1 = hij_local
+        h2 = hijkl_local
+
+    # Setup Hamiltonian
+    ha = qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly(hi, h1, h2, use_fast_update=False)
+
+    # Setup Ansatz
+    dtype = jnp.complex128
+    init_fun = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
+    count_spins = lambda spins: jnp.stack([jnp.zeros(spins.shape[0]), spins&1, (spins&2)/2, jnp.zeros(spins.shape[0])], axis=-1).astype(jnp.int32)
+    def renormalize_log_psi(n_spins, hilbert, index):
+        # 1. if the number of spin-up (spin-down) electrons until index
+        #    is equal to n_elec_up (n_elec_down), then set to 0 the probability
+        #    of sampling a singly occupied orbital with a spin-up (spin-down)
+        #    electron, as well as the probability of sampling a doubly occupied orbital
+        # 2. if the number of spin-up (spin-down) electrons that still need to be
+        #    distributed, is smaller than the number of sites left, then set the probability
+        #    of sampling an empty orbital to 0
+        log_psi = jnp.zeros(hilbert.local_size)
+        diff = jnp.array(hilbert._n_elec, jnp.int32)-n_spins[1:3]
+        log_psi = jax.lax.cond(
+            diff[0] == 0,
+            lambda log_psi: log_psi.at[1].set(-jnp.inf),
+            lambda log_psi: log_psi,
+            log_psi
+        )
+        log_psi = jax.lax.cond(
+            diff[1] == 0,
+            lambda log_psi: log_psi.at[2].set(-jnp.inf),
+            lambda log_psi: log_psi,
+            log_psi
+        )
+        log_psi = jax.lax.cond(
+            (diff == 0).any(),
+            lambda log_psi: log_psi.at[3].set(-jnp.inf),
+            lambda log_psi: log_psi,
+            log_psi
+        )
+        log_psi = jax.lax.cond(
+            (diff >= (hilbert.size-index)).any(),
+            lambda log_psi: log_psi.at[0].set(-jnp.inf),
+            lambda log_psi: log_psi,
+            log_psi
+        )
+        return log_psi
+    ma = qk.models.ARqGPS(
+        hi, config.M, dtype=dtype,
+        init_fun=init_fun,
+        count_spins=count_spins,
+        renormalize_log_psi=jax.vmap(renormalize_log_psi, in_axes=(0, None, None))
+    )
+
+    # Compute samples per rank
+    if config.samples % MPIVars.n_nodes != 0:
+        raise ValueError("Define a number of samples that is a multiple of the number of MPI ranks")
+    samples_per_rank = config.samples // MPIVars.n_nodes
+
+    # Sampler
+    sa = qk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank, dtype=jnp.uint8)
+
+    # Variational state
+    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
+
+    # Optimizer
+    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
+    sr = nk.optimizer.SR(qgt=partial(nk.optimizer.qgt.QGTJacobianDense, mode='complex', diag_shift=config.diagonal_shift), iterative=config.sr_iterative)
+
+    return ha, (op, sr), vs, (norb, mol)
+
+def get_exact_energy(hamiltonian, n_orbitals, molecule):
+    energy_mo, _ = fci.direct_spin1.FCI().kernel(hamiltonian.h_mat, hamiltonian.eri_mat, n_orbitals, molecule.nelectron)
+    energy_nuc = molecule.energy_nuc()
+    exact_energy = energy_mo + energy_nuc
+    return exact_energy, energy_nuc
 
 def train():
     # Parser
@@ -115,109 +228,8 @@ def train():
     # Config
     config = initialize_config(args)
 
-    # Setup Hilbert space
-    mol = gto.Mole()
-    mol.build(
-        atom = [('H', (x, 0., 0.)) for x in config.dist*np.arange(config.n_atoms)],
-        basis = 'sto-6g',
-        symmetry = True,
-        unit="Bohr"
-    )
-    nelec = mol.nelectron
-    print('Number of electrons: ', nelec)
-
-    myhf = scf.RHF(mol)
-    ehf = myhf.scf()
-    norb = myhf.mo_coeff.shape[1]
-    print('Number of molecular orbitals: ', norb)
-
-    # Get hamiltonian elements
-    # 1-electron 'core' hamiltonian terms, transformed into MO basis
-    h1 = np.linalg.multi_dot((myhf.mo_coeff.T, myhf.get_hcore(), myhf.mo_coeff))
-
-    # Get 2-electron electron repulsion integrals, transformed into MO basis
-    eri = ao2mo.incore.general(myhf._eri, (myhf.mo_coeff,)*4, compact=False)
-
-    # Previous representation exploited permutational symmetry in storage. Change this to a 4D array.
-    # Integrals now stored as h2[p,q,r,s] = (pq|rs) = <pr|qs>. Note 8-fold permutational symmetry.
-    h2 = ao2mo.restore(1, eri, norb)
-    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=(nelec//2,nelec//2))
-
-    # Setup Hamiltonian
-    ha = qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly(hi, h1, h2, use_fast_update=False)
-
-    # Transform to a local orbital basis if wanted
-    if config.basis == 'local':
-        loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
-        ovlp = myhf.get_ovlp()
-        # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
-        assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
-        # Find the hamiltonian in the local basis
-        hij_local = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
-        hijkl_local = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
-        h1 = hij_local
-        h2 = hijkl_local
-
-    # Setup Ansatz
-    dtype = jnp.complex128
-    init_fun = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
-    count_spins = lambda spins: jnp.stack([jnp.zeros(spins.shape[0]), spins&1, (spins&2)/2, jnp.zeros(spins.shape[0])], axis=-1).astype(jnp.int32)
-    def renormalize_log_psi(n_spins, hilbert, index):
-        # 1. if the number of spin-up (spin-down) electrons until index
-        #    is equal to n_elec_up (n_elec_down), then set to 0 the probability
-        #    of sampling a singly occupied orbital with a spin-up (spin-down)
-        #    electron, as well as the probability of sampling a doubly occupied orbital
-        # 2. if the number of spin-up (spin-down) electrons that still need to be
-        #    distributed, is smaller than the number of sites left, then set the probability
-        #    of sampling an empty orbital to 0
-        log_psi = jnp.zeros(hilbert.local_size)
-        diff = jnp.array(hilbert._n_elec, jnp.int32)-n_spins[1:3]
-        log_psi = jax.lax.cond(
-            diff[0] == 0,
-            lambda log_psi: log_psi.at[1].set(-jnp.inf),
-            lambda log_psi: log_psi,
-            log_psi
-        )
-        log_psi = jax.lax.cond(
-            diff[1] == 0,
-            lambda log_psi: log_psi.at[2].set(-jnp.inf),
-            lambda log_psi: log_psi,
-            log_psi
-        )
-        log_psi = jax.lax.cond(
-            (diff == 0).any(),
-            lambda log_psi: log_psi.at[3].set(-jnp.inf),
-            lambda log_psi: log_psi,
-            log_psi
-        )
-        log_psi = jax.lax.cond(
-            (diff >= (hilbert.size-index)).any(),
-            lambda log_psi: log_psi.at[0].set(-jnp.inf),
-            lambda log_psi: log_psi,
-            log_psi
-        )
-        return log_psi
-    ma = qk.models.ARqGPS(
-        hi, config.M, dtype=dtype,
-        init_fun=init_fun,
-        count_spins=count_spins,
-        renormalize_log_psi=jax.vmap(renormalize_log_psi, in_axes=(0, None, None))
-    )
-
-    # Compute samples per rank
-    if config.samples % MPIVars.n_nodes != 0:
-        raise ValueError("Define a number of samples that is a multiple of the number of MPI ranks")
-    samples_per_rank = config.samples // MPIVars.n_nodes
-
-    # Sampler
-    sa = qk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank, dtype=jnp.uint8)
-
-    # Variational state
-    vs = nk.vqs.MCState(sa, ma, n_samples=config.samples)
-
-    # Optimizer
-    op = nk.optimizer.Sgd(learning_rate=config.learning_rate)
-    sr = nk.optimizer.SR(qgt=partial(nk.optimizer.qgt.QGTJacobianDense, mode='complex', diag_shift=config.diagonal_shift), iterative=config.sr_iterative)
+    # Setup Hamiltonian, optimizer and variational state
+    ha, (op, sr), vs, (norb, mol) = setup_vmc(config)
 
     # Load checkpoint
     if args.load_checkpoint_dir and os.path.isdir(args.load_checkpoint_dir):
@@ -262,14 +274,12 @@ def train():
     # Comparison with exact result
     if args.compare_to_ed:
         # Get exact energy
-        energy_mo, _ = fci.direct_spin1.FCI().kernel(h1, h2, norb, mol.nelectron)
-        nuc_en = mol.energy_nuc()
-        exact_energy = energy_mo + nuc_en
+        exact_energy, energy_nuc = get_exact_energy(ha, norb, mol)
 
         # Get converged energy estimate
         data = logger.data
         var_energy = np.mean(data["Energy"]["Mean"][-10:].real)
-        estimated_energy = var_energy + nuc_en
+        estimated_energy = var_energy + energy_nuc
         if MPIVars.rank == 0:
             print(f"\nEstimated energy:\t{estimated_energy}")
             print(f"Exact energy:\t\t{exact_energy}")
