@@ -30,8 +30,10 @@ def train():
         vs.variables = variables
 
     # Set chunk size
-    if args.set_chunk_size:
+    if args.chunk_size is None and args.set_chunk_size:
         vs.chunk_size = compute_chunk_size(args.chunk_size_multiplier, vs.n_samples_per_rank, ha.hilbert.size)
+    elif args.chunk_size:
+        vs.chunk_size = args.chunk_size
 
     # Variational Monte Carlo driver
     vmc = nk.VMC(ha, op, variational_state=vs, preconditioner=sr)

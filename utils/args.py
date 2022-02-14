@@ -118,6 +118,8 @@ def create_parser(description):
              "last" pick last checkpoint.')
 
     # Chunking
+    parser.add_argument('--chunk-size', type=int,
+        help='Chunk size used by the variational state to calculate expectation values')
     parser.add_argument('--chunk-size-multiplier', type=float, default=1.0,
         help='Multiplier for the chunk size calculation (default: 1.0)')
     parser.add_argument('--set-chunk-size', action='store_true',
