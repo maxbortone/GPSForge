@@ -75,8 +75,14 @@ def setup_vmc(config):
     h2 = ao2mo.restore(1, eri, norb)
 
     # Transform to a local orbital basis if wanted
-    if config.basis == 'local':
+    if 'local' in config.basis:
         loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
+        if 'boys' in config.basis:
+            loc_coeff = lo.Boys(mol, mo_coeff=myhf.mo_coeff).kernel()
+        elif 'pipek-mezey' in config.basis:
+            loc_coeff = lo.PipekMezey(mol, mo_coeff=myhf.mo_coeff).kernel()
+        elif 'edmiston-ruedenberg' in config.basis:
+            loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=myhf.mo_coeff).kernel()
         ovlp = myhf.get_ovlp()
         # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
         assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
