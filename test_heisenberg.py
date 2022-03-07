@@ -1,14 +1,42 @@
 import os
 import json
+import configargparse
 import jax; jax.config.update('jax_platform_name', 'cpu')
 import numpy as np
-from utils import create_test_parser
+from utils import int_or_iterable, dir_path
 from utils import select_checkpoint
 from utils import read_config
 from utils import MPIVars, setup_vmc, compute_chunk_size
 from utils import restore_model
 from utils import Timer
+from .train_heisenberg import setup_vmc
 
+
+def create_test_parser(description):
+    parser = configargparse.ArgumentParser(description=description)
+
+    # Testing
+    parser.add_argument('--sample-sizes', type=int_or_iterable,
+        help='Sample sizes on which to test the Ansatz')
+
+    # Checkpointing
+    parser.add_argument('--load-checkpoint-dir', type=dir_path,
+        help='Directory from which checkpoints are loaded')
+    parser.add_argument('--load-checkpoint', type=str, default='best',
+        help='Checkpoint or strategy used to select one from load_checkpoint_dir: \
+             "{uuid}" pick checkpoint at load_checkpoint_dir/{uuid}, \
+             "best" pick checkpoint with best energy, \
+             "last" pick last checkpoint.')
+    parser.add_argument('--save', action='store_true',
+        help='Whether to save the test outcome or not; if True saves to same directory as checkpoint')
+
+    # Chunking
+    parser.add_argument('--chunk-size-multiplier', type=float, default=1.0,
+        help='Multiplier for the chunk size calculation (default: 1.0)')
+    parser.add_argument('--set-chunk-size', action='store_true',
+        help='Activate chunking on variational state, sets chunk_size=2**(ceil(log2(n_samples_per_rank*hilbert.size*multiplier)))')
+
+    return parser
 
 def test():
     # Parser

@@ -1,6 +1,5 @@
 import os
 import uuid
-import yaml
 import json
 import numpy as np
 import pandas as pd
@@ -69,7 +68,7 @@ def restore_model(path, filename='output'):
         variables = msgpack_restore(b.read())
     return variables
 
-def list_results(paths, sort_by=['L', 'N'], config_class=Config):
+def list_results(paths, sort_by=None, config_class=Config):
     if isinstance(paths, str):
         results = [os.path.join(paths, result) for result in os.listdir(paths)]
     elif isinstance(paths, list):
@@ -84,6 +83,7 @@ def list_results(paths, sort_by=['L', 'N'], config_class=Config):
         config['uuid'] = os.path.basename(result)
         configs.append(config)
     df = pd.DataFrame(configs)
-    df = df.sort_values(sort_by)
+    if sort_by:
+        df = df.sort_values(sort_by)
     df = df.reset_index(drop=True)
     return df

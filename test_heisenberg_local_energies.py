@@ -3,12 +3,13 @@ import json
 import jax; jax.config.update('jax_platform_name', 'cpu')
 import numpy as np
 import netket as nk
-from utils import create_test_parser
 from utils import select_checkpoint
 from utils import read_config
-from utils import MPIVars, setup_vmc, compute_chunk_size
+from utils import MPIVars, compute_chunk_size
 from utils import restore_model
 from utils import Timer
+from .test_heisenberg import create_test_parser
+from .train_heisenberg import setup_vmc
 
 
 def test():
