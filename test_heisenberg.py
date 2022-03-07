@@ -3,12 +3,12 @@ import json
 import configargparse
 import jax; jax.config.update('jax_platform_name', 'cpu')
 import numpy as np
-from utils import int_or_iterable, dir_path
-from utils import select_checkpoint
-from utils import read_config
-from utils import MPIVars, setup_vmc, compute_chunk_size
-from utils import restore_model
-from utils import Timer
+from VMCutils import int_or_iterable, dir_path
+from VMCutils import select_checkpoint
+from VMCutils import read_config
+from VMCutils import MPIVars, compute_chunk_size
+from VMCutils import restore_model
+from VMCutils import Timer
 from .train_heisenberg import setup_vmc
 
 

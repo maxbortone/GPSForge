@@ -6,15 +6,15 @@ import jax.numpy as jnp
 import numpy as np
 import netket as nk
 import qGPSKet as qk
+import pandas as pd
 from scipy.sparse.linalg import eigsh
 from functools import partial
-from utils import bool_or_iterable, dir_path
-from utils import initialize_config, save_config
-from utils import MPIVars, compute_chunk_size
-from utils import create_result
-from utils import get_exact_energy
-from utils import restore_model, select_checkpoint
-from utils import Timer
+from VMCutils import bool_or_iterable, dir_path
+from VMCutils import save_config
+from VMCutils import MPIVars, compute_chunk_size
+from VMCutils import create_result
+from VMCutils import restore_model, select_checkpoint
+from VMCutils import Timer
 
 
 @dataclasses.dataclass
@@ -304,6 +304,23 @@ def setup_vmc(config):
 
     return ha, (op, sr), vs
 
+def get_exact_energy(hamiltonian, config):
+    exact_energy = None
+    base_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    if config.Lx is not None and config.Ly is None:
+        path = os.path.join(base_path, 'data/result_DMRG_Heisenberg_1D.csv')
+        df = pd.read_csv(path, dtype={'L': np.int16, 'E': np.float64})
+        if (df['L']==config.Lx).any():
+            exact_energy = df.loc[df['L']==config.Lx]['E'].values[0]
+    elif config.Lx is not None and config.Ly is not None:
+        path = os.path.join(base_path, 'data/result_ED_J1J2_2D.csv')
+        df = pd.read_csv(path, skiprows=0, header=1, dtype={'Lx': np.int16, 'Ly': np.int16, 'J1': np.float32, 'J2': np.float32, 'E/N': np.float32, 'E': np.float32})
+        if ((df['Lx']==config.Lx) & (df['Ly']==config.Ly) & (df['J1']==config.J1) & (df['J2']==config.J2)).any():
+            exact_energy = df.loc[(df['Lx']==config.Lx) & (df['Ly']==config.Ly) & (df['J1']==config.J1) & (df['J2']==config.J2)]['E'].values[0]
+    if exact_energy is None:
+        exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
+    return exact_energy
+
 def train():
     # Parser
     parser = create_parser('Train an Ansatz on a Heisenberg system using VMC')
@@ -364,9 +381,7 @@ def train():
         estimated_energy = np.mean(data["Energy"]["Mean"][-10:].real)
 
         # Get exact energy
-        exact_energy = get_exact_energy(config)
-        if exact_energy is None:
-            exact_energy = eigsh(ha.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
+        exact_energy = get_exact_energy(ha, config)
         if MPIVars.rank == 0:
             print(f"\nEstimated energy:\t{estimated_energy}")
             print(f"Exact energy:\t\t{exact_energy}")

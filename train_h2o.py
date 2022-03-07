@@ -7,11 +7,11 @@ import qGPSKet as qk
 import numpy as np
 import jax.numpy as jnp
 from pyscf import scf, gto, ao2mo, fci, lo
-from utils import dir_path, save_config
-from utils import MPIVars, compute_chunk_size
-from utils import create_result
-from utils import restore_model, select_checkpoint
-from utils import Timer
+from VMCutils import dir_path, save_config
+from VMCutils import MPIVars, compute_chunk_size
+from VMCutils import create_result
+from VMCutils import restore_model, select_checkpoint
+from VMCutils import Timer
 from functools import partial
 
 
