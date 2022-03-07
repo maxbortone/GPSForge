@@ -1,6 +1,7 @@
 __pycache__
 plots/
 results/
+notebooks/
 profiles/
 tmp/
 *.out
