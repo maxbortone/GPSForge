@@ -365,14 +365,20 @@ def train():
     if MPIVars.rank == 0:
         print(f"Running optimisation for: \n{config}")
         print("Iteration\t Energy statistics\t\t Gradient norm")
-        t = Timer(config.iterations)
+    t = Timer(config.iterations)
     for step in vmc.iter(config.iterations):
-        logger(step, {"Energy": vmc._loss_stats}, vmc.state)
+        t.update(step+1)
+        runtimes = MPIVars.comm.gather(t.runtime, root=0)
+        if MPIVars.rank == 0:
+            runtime = np.mean(runtimes)
+        else:
+            runtime = None
+        runtime = MPIVars.comm.bcast(runtime, root=0)
         if MPIVars.rank == 0:
             grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
             grad_norm = np.linalg.norm(grad)
-            t.update(step+1)
-            print(f"[{step+1}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm} [{t.elapsed_time}<{t.remaining_time}, {t.runtime}s/it]", flush=True)
+            print(f"[{step+1}/{config.iterations}] E: {vmc.energy}, ||∇E||: {grad_norm:.4f} [{t.elapsed_time}<{t.remaining_time}, {runtime:.4f}s/it]", flush=True)
+        logger(step, {"Energy": vmc._loss_stats, "Runtime": runtime}, vmc.state)
 
     # Comparison with exact result
     if args.compare_to_ed:
