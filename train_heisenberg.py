@@ -1,4 +1,5 @@
 import os
+import pathlib
 import configargparse
 import dataclasses
 import jax; jax.config.update('jax_platform_name', 'cpu')
@@ -306,7 +307,7 @@ def setup_vmc(config):
 
 def get_exact_energy(hamiltonian, config):
     exact_energy = None
-    base_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    base_path = pathlib.Path(__file__).parent.resolve()
     if config.Lx is not None and config.Ly is None:
         path = os.path.join(base_path, 'data/result_DMRG_Heisenberg_1D.csv')
         df = pd.read_csv(path, dtype={'L': np.int16, 'E': np.float64})
