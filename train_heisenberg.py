@@ -134,7 +134,7 @@ def create_parser(description):
     
     # Ansatz
     parser.add_argument('--ansatz', default='qgps',
-        choices=['qgps', 'arqgps'],
+        choices=['qgps', 'arqgps', 'arqgps-full'],
         help='Ansatz for the wavefunction (default: qgps)')
     parser.add_argument('--dtype', default='real',
         choices=['real', 'complex'],
@@ -244,7 +244,7 @@ def setup_vmc(config):
             hi, config.M,
             dtype=dtype, init_fun=init_fun,
             to_indices=to_indices, syms=(symmetries, inv_symmetries))
-    elif config.ansatz == 'arqgps':
+    elif 'arqgps' in config.ansatz:
         symmetries = g.automorphisms().to_array().T
         if automorphisms and spin_flip:
             def apply_symmetries(samples):
@@ -264,11 +264,18 @@ def setup_vmc(config):
             def apply_symmetries(samples):
                 out = jnp.expand_dims(samples, axis=-1)
                 return out
-        ma = qk.models.ARqGPS(
-            hi, config.M,
-            dtype=dtype, init_fun=init_fun,
-            to_indices=to_indices,
-            apply_symmetries=apply_symmetries)
+        if 'full' in config.ansatz:
+            ma = qk.models.ARqGPSFull(
+                hi, config.M,
+                dtype=dtype, init_fun=init_fun,
+                to_indices=to_indices,
+                apply_symmetries=apply_symmetries)
+        else:
+            ma = qk.models.ARqGPS(
+                hi, config.M,
+                dtype=dtype, init_fun=init_fun,
+                to_indices=to_indices,
+                apply_symmetries=apply_symmetries)
 
     # Compute samples per rank
     if config.samples % MPIVars.n_nodes != 0:
@@ -276,7 +283,7 @@ def setup_vmc(config):
     samples_per_rank = config.samples // MPIVars.n_nodes
 
     # Sampler
-    if config.sampler == 'ar-direct' and config.ansatz == 'arqgps':
+    if config.sampler == 'ar-direct' and 'arqgps' in config.ansatz:
         sa = qk.sampler.ARDirectSampler(hi, n_chains_per_rank=samples_per_rank)
     elif config.sampler == 'metropolis-exchange':
         sa = nk.sampler.MetropolisExchange(hi, graph=g, n_chains_per_rank=config.chains, n_sweeps=config.sweeps, d_max=config.Lx//2)
