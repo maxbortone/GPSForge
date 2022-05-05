@@ -2,7 +2,6 @@ import os
 import pathlib
 import configargparse
 import dataclasses
-import jax; jax.config.update('jax_platform_name', 'cpu')
 import jax.numpy as jnp
 import numpy as np
 import netket as nk
