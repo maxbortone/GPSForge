@@ -42,3 +42,69 @@ Currently the following options are available:
     - `SgdSR`: Stochastic gradient descent optimizer with Stochastic Reconfiguration preconditioning of gradients (uses the on-the-fly Quantum Geometric Tensor)
     - `SgdSRDense`: same as the above, but with the dense version of the QGT
     - `Adam`: Adam optimizer
+
+## Setup on GPU nodes
+To run code on GPU nodes in a HPC cluster, follow these steps.
+
+1. First, log into a GPU node and load the necessary modules:
+```
+module load anaconda3/2021.05-gcc-9.4.0
+module load cuda/11.4.2-gcc-9.4.0
+module load cudnn/8.2.4.15-11.4-gcc-9.4.0
+module load openmpi/4.1.1-gcc-9.4.0-ucx-python-3.8.12
+```
+
+2. Create a new conda environment:
+```
+conda create --name qgps-gpu python=3.8
+conda activate qgps-gpu
+```
+
+3. Download and install the correct version of `jaxlib` (e.g. CUDA11, CuDNN 8.2 and Python 3.8):
+```
+pip install --upgrade pip
+wget -v https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.3.8+cuda11.cudnn82-cp38-none-manylinux2014_x86_64.whl
+pip install jaxlib-0.3.8+cuda11.cudnn82-cp38-none-manylinux2014_x86_64.whl
+```
+
+4. Install [JAX](https://github.com/google/jax):
+```
+pip install jax
+```
+
+5. Install [mpi4py](https://github.com/mpi4py/mpi4py):
+```
+pip install mpi4py
+```
+
+6. Install [mpi4jax](https://github.com/mpi4jax/mpi4jax):
+```
+pip install cython
+pip install mpi4jax --no-build-isolation
+```
+
+7. Install [NetKet](https://github.com/netket/netket) with MPI support:
+```
+pip install "netket[mpi]"
+```
+
+8. Install [ml-collections](https://github.com/google/ml_collections):
+```
+pip install ml-collections
+```
+
+9. Create a bash script that binds GPU devices to individual MPI ranks:
+```
+cat << EOF > bind_gpu.sh
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=$OMPI_COMM_WORLD_LOCAL_RANK
+
+$@
+EOF
+chmod +x bind_gpu.sh
+```
+
+10. Run your job with as many ranks as available GPU devices (e.g. 4 ranks on a node with 4 GPUs):
+```
+mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/qgps.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+```
