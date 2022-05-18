@@ -3,7 +3,6 @@ import time
 import yaml
 import ml_collections
 import numpy as np
-import jax.numpy as jnp
 import netket as nk
 import qGPSKet as qk
 from absl import logging
@@ -30,7 +29,11 @@ def train(config: ml_collections.ConfigDict, workdir: str):
         'MetropolisExchange': nk.sampler.MetropolisExchange,
         'ARDirectSampler': qk.sampler.ARDirectSampler
     }[config.get('sampler_name', 'ARDirectSampler')]
-    sa = sa_cls(hi, **config.sampler, dtype=jnp.uint8)
+    if config.system_name in ['Heisenberg1d', 'Heisenberg2d', 'J1J22d']:
+        sa_dtype = np.int8
+    elif config.system_name in ['Hchain', 'H2O']:
+        sa_dtype = np.uint8
+    sa = sa_cls(hi, **config.sampler, dtype=sa_dtype)
 
     # Variational state
     if config.variational_state_name == 'MCState':
