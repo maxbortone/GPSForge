@@ -16,11 +16,11 @@ MPIVars = MPIVariables()
 
 
 def add_file_logger(workdir, *, basename='train', level=python_logging.INFO):
-  """Adds a file logger to Python logging handlers"""
-  filename = f'{workdir}/{basename}.log'
-  os.makedirs(os.path.dirname(filename), exist_ok=True)
-  mode = 'a' if os.path.isfile(filename) else 'w'
-  fh = python_logging.FileHandler(filename, mode)
-  fh.setLevel(level)
-  fh.setFormatter(logging.PythonFormatter())
-  python_logging.getLogger('').addHandler(fh)
+    """Adds a file logger to Python logging handlers"""
+    filename = f'{workdir}/{basename}.log'
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    mode = 'a' if os.path.isfile(filename) else 'w'
+    fh = python_logging.FileHandler(filename, mode)
+    fh.setLevel(level)
+    fh.setFormatter(logging.PythonFormatter())
+    python_logging.getLogger('').addHandler(fh)
