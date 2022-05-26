@@ -8,22 +8,19 @@ def get_ARDirectSampler_config(parent : ConfigDict) -> ConfigDict:
 def get_MetropolisExchange_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_chains_per_rank = 4
-    system_name = parent.get_ref('system_name')
-    if system_name in ['Heisenberg2d', 'J1J22d']:
-        n_sites = parent.get_ref('Lx')*parent.get_ref('Ly')
-    elif system_name == 'Heisenberg1d':
-        n_sites = parent.get_ref('Lx')
-    config.n_sweeps = n_sites
-    config.d_max = parent.get_ref('Lx')//2
+    config.n_sweeps = parent.system.get_ref('Lx')*parent.system.get('Ly', 1)
+    config.d_max = parent.system.get_ref('Lx')//2
     return config
 
 def get_MetropolisLocal_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_chains_per_rank = 4
-    system_name = parent.get_ref('system_name')
-    if system_name in ['Heisenberg2d', 'J1J22d']:
-        n_sites = parent.get_ref('Lx')*parent.get_ref('Ly')
-    elif system_name == 'Heisenberg1d':
-        n_sites = parent.get_ref('Lx')
-    config.n_sweeps = n_sites
+    config.n_sweeps = parent.system.get_ref('Lx')*parent.system.get('Ly', 1)
+    return config
+
+def get_MetropolisHopping_config(parent : ConfigDict) -> ConfigDict:
+    config = ConfigDict()
+    config.n_chains_per_rank = 4
+    config.n_sweeps = parent.system.get_ref('Lx')*parent.system.get('Ly', 1)
+    config.hop_probability = 1.0
     return config

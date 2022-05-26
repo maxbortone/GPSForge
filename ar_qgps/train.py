@@ -27,6 +27,7 @@ def train(config: ml_collections.ConfigDict, workdir: str):
     sa_cls = {
         'MetropolisLocal': nk.sampler.MetropolisLocal,
         'MetropolisExchange': nk.sampler.MetropolisExchange,
+        'MetropolisHopping': qk.sampler.MetropolisHopping,
         'ARDirectSampler': qk.sampler.ARDirectSampler
     }[config.get('sampler_name', 'ARDirectSampler')]
     if config.system_name in ['Heisenberg1d', 'Heisenberg2d', 'J1J22d']:
