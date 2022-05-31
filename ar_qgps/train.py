@@ -1,6 +1,5 @@
 import os
 import time
-import yaml
 import ml_collections
 import numpy as np
 import netket as nk
@@ -8,8 +7,8 @@ import qGPSKet as qk
 from absl import logging
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
-from ar_qgps.checkpoints import save_checkpoint, restore_checkpoint
-from ar_qgps.utils import MPIVars
+from VMCutils import MPIVars, write_config, Timer
+from VMCutils import save_checkpoint, restore_checkpoint
 
 
 def train(config: ml_collections.ConfigDict, workdir: str):
@@ -72,14 +71,13 @@ def train(config: ml_collections.ConfigDict, workdir: str):
     # NOTE: JsonLog currently overwrites `output.log` file if it already exists
     logger = nk.logging.JsonLog(os.path.join(workdir, 'output'), save_params=False, write_every=config.log_every)
     if MPIVars.rank == 0:
-        config_path = os.path.join(workdir, f'config.yaml')
-        with open(config_path, 'w') as f:
-            yaml.safe_dump(config.to_dict(), f, default_flow_style=False, allow_unicode=True)
-        logging.info(f'Saved config at {config_path}')
+        write_config(workdir, config)
+        logging.info(f"Saved config at {os.path.join(workdir, 'config.yaml')}")
 
     # Run training loop
     if MPIVars.rank == 0:
         logging.info('Starting training loop; initial compile can take a while...')
+        timer = Timer(config.total_steps)
         t0 = time.time()
     total_steps = config.total_steps
     for step in range(initial_step, total_steps + 1):
@@ -91,18 +89,18 @@ def train(config: ml_collections.ConfigDict, workdir: str):
             logging.info('First step took %.1f seconds.', time.time() - t0)
             t0 = time.time()
 
+        if MPIVars.rank == 0:
+            timer.update(step)
+
         # Report training metrics
         if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
             grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
             grad_norm = np.linalg.norm(grad)
             done = step / total_steps
-            delta_t = round(time.time()-t0) # in seconds
-            eta = round(delta_t/done*(1-done)) # in seconds
             logging.info(f'Step: {step}/{total_steps} {100*done:.1f}%, '  # pylint: disable=logging-format-interpolation
                          f'E: {vmc.energy}, '
                          f'||∇E||: {grad_norm:.4f}, '
-                         f'ETA: {eta//3600:02d}:{(eta%3600)//60:02d}:{eta%60:02d}, '
-                         f'Δt: {delta_t//3600:02d}:{(delta_t%3600)//60:02d}:{delta_t%60:02d}')
+                         f'{timer}')
 
         # Store checkpoint
         if MPIVars.rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == total_steps):

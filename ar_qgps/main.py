@@ -4,7 +4,7 @@ from absl import flags
 from absl import logging
 from ml_collections import config_flags
 from ar_qgps import train
-from ar_qgps import utils
+from VMCutils import MPIVars, add_file_logger
 
 
 FLAGS = flags.FLAGS
@@ -23,8 +23,8 @@ def main(argv):
     if len(argv) > 1:
         raise app.UsageError('Too many command-line arguments.')
 
-    if utils.MPIVars.rank == 0:
-        utils.add_file_logger(_WORKDIR.value, basename=FLAGS.config.trainer)
+    if MPIVars.rank == 0:
+        add_file_logger(_WORKDIR.value, basename=FLAGS.config.trainer)
 
         logging.info('JAX process: %d / %d', jax.process_index(), jax.process_count())
         logging.info('JAX local devices: %r', jax.local_devices())

@@ -1,26 +1,48 @@
 import os
-import logging as python_logging
-from absl import logging
-from mpi4py import MPI
-from dataclasses import dataclass
+import re
+import pathlib
+import numpy as np
+import pandas as pd
+from scipy.sparse.linalg import eigsh
+from typing import Union, Tuple
+from ml_collections import ConfigDict
+from netket.operator import AbstractOperator
+from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
+from pyscf import fci
+from pyscf.gto import Mole
 
 
-# MPI variables
-@dataclass
-class MPIVariables:
-    comm : MPI.Comm = MPI.COMM_WORLD.Create(MPI.COMM_WORLD.Get_group())
-    rank : int = comm.Get_rank()
-    n_nodes : int = comm.Get_size()
+def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
+    """
+    Returns the exact energy for a Heisenberg system defined by `config` if present in ./data folder,
+    else attempts to diagonalize the Hamiltonian.
+    If this also fails, returns None
+    """
+    exact_energy = None
+    base_path = pathlib.Path(__file__).parent.parent.resolve()
+    Lx = config.Lx
+    Ly = config.get('Ly', 1)
+    J1 = config.J1
+    J2 = config.get('J2', 0.0)
+    if Ly == 1:
+        path = os.path.join(base_path, 'data/result_DMRG_Heisenberg_1D.csv')
+        df = pd.read_csv(path, dtype={'L': np.int16, 'J': np.float32, 'E': np.float32})
+        row = df.query('L == @Lx and J == @J1')
+        exact_energy = row['E'].values[0]
+    else:
+        path = os.path.join(base_path, 'data/result_ED_J1J2_2D.csv')
+        df = pd.read_csv(path, skiprows=0, header=1, dtype={'Lx': np.int16, 'Ly': np.int16, 'J1': np.float32, 'J2': np.float32, 'E/N': np.float32, 'E': np.float32})
+        row = df.query('Lx == @Lx and Ly == @Ly and J1 == @J1 and J2 == @ J2')
+        exact_energy = row['E'].values[0]
+    if exact_energy is None and hamiltonian is not None:
+        exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
+    return exact_energy
 
-MPIVars = MPIVariables()
-
-
-def add_file_logger(workdir, *, basename='train', level=python_logging.INFO):
-    """Adds a file logger to Python logging handlers"""
-    filename = f'{workdir}/{basename}.log'
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    mode = 'a' if os.path.isfile(filename) else 'w'
-    fh = python_logging.FileHandler(filename, mode)
-    fh.setLevel(level)
-    fh.setFormatter(logging.PythonFormatter())
-    python_logging.getLogger('').addHandler(fh)
+def get_molecular_exact_energy(hamiltonian: AbInitioHamiltonianOnTheFly, n_orbitals: int, molecule: Mole) -> Tuple[float, float]:
+    """
+    Returns the exact energy for a molecular system, computed with a FCI solver
+    """
+    energy_mo, _ = fci.direct_spin1.FCI().kernel(hamiltonian.h_mat, hamiltonian.eri_mat, n_orbitals, molecule.nelectron)
+    energy_nuc = molecule.energy_nuc()
+    exact_energy = energy_mo + energy_nuc
+    return exact_energy, energy_nuc

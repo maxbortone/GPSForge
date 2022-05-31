@@ -5,7 +5,7 @@ from ml_collections import ConfigDict
 from netket.operator import AbstractOperator, Heisenberg
 from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
 from pyscf import scf, gto, ao2mo, lo
-from ar_qgps.utils import MPIVars
+from VMCutils import MPIVars
 
 
 def get_system(name : str, config : ConfigDict) -> AbstractOperator:
@@ -20,11 +20,11 @@ def get_system(name : str, config : ConfigDict) -> AbstractOperator:
         Hamiltonian for the system
     """
     if 'Heisenberg' in name or 'J1J2' in name:
-        return get_J1J2_system(config)
+        return get_Heisenberg_system(config)
     elif name == 'Hchain' or name == 'H2O':
         return get_molecular_system(config)
 
-def get_J1J2_system(config : ConfigDict) -> Heisenberg:
+def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     """
     Return the Hamiltonian for Heisenberg system
 
