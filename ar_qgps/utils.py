@@ -1,5 +1,4 @@
 import os
-import re
 import pathlib
 import numpy as np
 import pandas as pd
@@ -8,8 +7,7 @@ from typing import Union, Tuple
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator
 from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
-from pyscf import fci
-from pyscf.gto import Mole
+from pyscf import gto, fci
 
 
 def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
@@ -38,11 +36,20 @@ def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperat
         exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
     return exact_energy
 
-def get_molecular_exact_energy(hamiltonian: AbInitioHamiltonianOnTheFly, n_orbitals: int, molecule: Mole) -> Tuple[float, float]:
+def get_molecular_exact_energy(config: ConfigDict, hamiltonian: AbInitioHamiltonianOnTheFly) -> Tuple[float, float]:
     """
-    Returns the exact energy for a molecular system, computed with a FCI solver
+    Returns the exact energy for a molecular system defined by `config` and `hamiltonian`, computed with a FCI solver
     """
-    energy_mo, _ = fci.direct_spin1.FCI().kernel(hamiltonian.h_mat, hamiltonian.eri_mat, n_orbitals, molecule.nelectron)
-    energy_nuc = molecule.energy_nuc()
+    n_electrons = np.sum(hamiltonian.hilbert._n_elec)
+    n_orbitals = hamiltonian.hilbert.size
+    mol = gto.Mole()
+    mol.build(
+        atom = config.atom,
+        basis = config.basis_set,
+        symmetry=config.symmetry,
+        unit=config.unit
+    )
+    energy_mo, _ = fci.direct_spin1.FCI().kernel(hamiltonian.h_mat, hamiltonian.eri_mat, n_orbitals, n_electrons)
+    energy_nuc = mol.energy_nuc()
     exact_energy = energy_mo + energy_nuc
     return exact_energy, energy_nuc
