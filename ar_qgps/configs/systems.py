@@ -1,4 +1,6 @@
-from ml_collections import ConfigDict
+from ml_collections import ConfigDict, FieldReference
+from ml_collections.config_dict import placeholder
+from numpy import place
 
 
 def get_Heisenberg1d_config() -> ConfigDict:
@@ -32,11 +34,10 @@ def get_J1J22d_config() -> ConfigDict:
     return config
 
 def get_Hchain_config() -> ConfigDict:
-    # TODO: check if these configs create a chain or a ring
     config = ConfigDict()
     config.n_atoms = 10
     config.distance = 1.8
-    config.atom = [('H', (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
+    config.atom = 'H'
     config.basis_set = 'sto-6g'
     config.basis = 'canonical'
     config.symmetry = True

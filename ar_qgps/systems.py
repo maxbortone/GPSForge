@@ -62,8 +62,12 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
     # Setup Hilbert space
     if MPIVars.rank == 0:
         mol = gto.Mole()
+        if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
+            atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
+        else:
+            atom = config.atom
         mol.build(
-            atom = config.atom,
+            atom = atom,
             basis = config.basis_set,
             symmetry=config.symmetry,
             unit=config.unit

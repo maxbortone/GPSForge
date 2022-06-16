@@ -7,7 +7,7 @@ from typing import Union, Tuple
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator
 from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
-from pyscf import gto, fci
+from pyscf import gto, fci, scf
 
 
 def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
@@ -43,8 +43,12 @@ def get_molecular_exact_energy(config: ConfigDict, hamiltonian: AbInitioHamilton
     n_electrons = np.sum(hamiltonian.hilbert._n_elec)
     n_orbitals = hamiltonian.hilbert.size
     mol = gto.Mole()
+    if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
+        atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
+    else:
+        atom = config.atom
     mol.build(
-        atom = config.atom,
+        atom = atom,
         basis = config.basis_set,
         symmetry=config.symmetry,
         unit=config.unit
@@ -53,3 +57,22 @@ def get_molecular_exact_energy(config: ConfigDict, hamiltonian: AbInitioHamilton
     energy_nuc = mol.energy_nuc()
     exact_energy = energy_mo + energy_nuc
     return exact_energy, energy_nuc
+
+def get_molecular_hf_energy(config: ConfigDict) -> Tuple[float, float]:
+    """
+    Returns the Hartree-Fock energy for a molecular system defined by `config` and `hamiltonian`
+    """
+    mol = gto.Mole()
+    if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
+        atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
+    else:
+        atom = config.atom
+    mol.build(
+        atom = atom,
+        basis = config.basis_set,
+        symmetry=config.symmetry,
+        unit=config.unit
+    )
+    mf = scf.RHF(mol)
+    hf_energy = mf.kernel()
+    return hf_energy
