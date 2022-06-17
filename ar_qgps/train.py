@@ -67,9 +67,8 @@ def train(config: ml_collections.ConfigDict, workdir: str):
     vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
     # Setup logger and write config to file
-    # FIXME: develop a new CSVLog class that simply appends data as a new row at the end of a .csv file
-    # NOTE: JsonLog currently overwrites `output.log` file if it already exists
-    logger = nk.logging.JsonLog(os.path.join(workdir, 'output'), save_params=False, write_every=config.log_every)
+    # TODO: replace JsonLog with HDF5Log
+    logger = nk.logging.JsonLog(os.path.join(workdir, f"output_{initial_step}"), save_params=False, write_every=config.log_every)
     if MPIVars.rank == 0:
         write_config(workdir, config)
         logging.info(f"Saved config at {os.path.join(workdir, 'config.yaml')}")
