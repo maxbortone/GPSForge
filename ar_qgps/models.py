@@ -1,11 +1,14 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import netket as nk
 import qGPSKet as qk
+from scipy.linalg import circulant
 from functools import partial
 from flax import linen as nn
 from netket.hilbert import HomogeneousHilbert
 from netket.graph import AbstractGraph
+from netket.utils import HashableArray
 from netket.utils.types import Array
 from ml_collections import ConfigDict
 from typing import Union, Tuple, Callable, Optional
@@ -43,7 +46,7 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             hilbert, config.M,
             dtype=dtype, init_fun=init_fn,
             to_indices=to_indices_fn, syms=(symmetries_fn, inv_symmetries_fn))
-    elif 'ARqGPS' in name:
+    elif 'AR' in name:
         if isinstance(hilbert, nk.hilbert.Spin):
             count_spins_fn = count_spins
             renormalize_log_psi_fn = renormalize_log_psi
@@ -52,10 +55,14 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             renormalize_log_psi_fn = renormalize_log_psi_fermionic
         ma_cls = {
             'ARqGPS': qk.models.ARqGPS,
-            'ARqGPSFull': qk.models.ARqGPSFull
+            'ARqGPSFull': qk.models.ARqGPSFull,
+            'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
         }[name]
+        args = [hilbert, config.M]
+        if 'Plaquette' in name:
+            args.extend(get_plaquettes_and_masks(hilbert, graph))
         ma = ma_cls(
-                hilbert, config.M,
+                *args,
                 dtype=dtype, init_fun=init_fn,
                 to_indices=to_indices_fn,
                 apply_symmetries=symmetries_fn,
@@ -79,7 +86,7 @@ def get_symmetry_transformation_spin(name : str, config : ConfigDict, graph : Ab
     spin_flip = config.symmetries in ['all', 'spin-flip']
     if name == 'qGPS':
         return qk.models.get_sym_transformation_spin(graph, automorphisms, spin_flip)
-    elif 'ARqGPS' in name:
+    elif 'AR' in name:
         symmetries = graph.automorphisms().to_array().T
         if automorphisms and spin_flip:
             def apply_symmetries(samples : Array) -> Array:
@@ -199,3 +206,15 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
         log_psi
     )
     return log_psi
+
+def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph):
+    L = hilbert.size
+    if graph and graph.ndim == 2:
+        # TODO: maybe replace this code with a double for loop over lattice coordinates
+        translations = graph.translation_group().to_array()
+        plaquettes = translations[np.argsort(translations[:,0])]
+        plaquettes = HashableArray(plaquettes)
+    else:
+        plaquettes = HashableArray(circulant(np.arange(L)))
+    masks = HashableArray(np.where(plaquettes >= np.repeat([np.arange(L)], L, axis=0).T, 0, 1))
+    return (plaquettes, masks)

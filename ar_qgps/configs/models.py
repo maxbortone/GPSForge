@@ -11,3 +11,4 @@ def get_qGPS_config() -> ConfigDict:
 
 get_ARqGPS_config = get_qGPS_config
 get_ARqGPSFull_config = get_qGPS_config
+get_ARPlaquetteqGPS_config = get_qGPS_config
