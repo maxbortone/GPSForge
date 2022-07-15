@@ -172,15 +172,15 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
     Returns:
         renormalized log-amplitude (batch,)
     """
+    # Compute difference between spin-up (spin-down) electrons up to index and
+    # total number of spin-up (spin-down) electrons
+    diff = jnp.array(hilbert._n_elec, jnp.int32)-n_spins[1:3]
+    
     # 1. if the number of spin-up (spin-down) electrons until index
     #    is equal to n_elec_up (n_elec_down), then set to 0 the probability
     #    of sampling a singly occupied orbital with a spin-up (spin-down)
     #    electron, as well as the probability of sampling a doubly occupied orbital
-    # 2. if the number of spin-up (spin-down) electrons that still need to be
-    #    distributed, is smaller than the number of sites left, then set the probability
-    #    of sampling an empty orbital to 0
     log_psi = jnp.zeros(hilbert.local_size)
-    diff = jnp.array(hilbert._n_elec, jnp.int32)-n_spins[1:3]
     log_psi = jax.lax.cond(
         diff[0] == 0,
         lambda log_psi: log_psi.at[1].set(-jnp.inf),
@@ -199,9 +199,19 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
         lambda log_psi: log_psi,
         log_psi
     )
+    
+    # 2. if the number of spin-up (spin-down) electrons that still need to be
+    #    distributed, is smaller or equal than the number of sites left, then set the probability
+    #    of sampling an empty orbital and one with the opposite spin to 0
     log_psi = jax.lax.cond(
-        (diff >= (hilbert.size-index)).any(),
-        lambda log_psi: log_psi.at[0].set(-jnp.inf),
+        (diff[0] >= (hilbert.size-index)).any(),
+        lambda log_psi: log_psi.at[np.array([0,2])].set(-jnp.inf),
+        lambda log_psi: log_psi,
+        log_psi
+    )
+    log_psi = jax.lax.cond(
+        (diff[1] >= (hilbert.size-index)).any(),
+        lambda log_psi: log_psi.at[np.array([0,1])].set(-jnp.inf),
         lambda log_psi: log_psi,
         log_psi
     )
