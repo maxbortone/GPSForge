@@ -13,3 +13,13 @@ def get_MCState_config(parent : ConfigDict) -> ConfigDict:
 def get_ExactState_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     return config
+
+def get_MCStateUniqeSamples_config(parent : ConfigDict) -> ConfigDict:
+    config = ConfigDict()
+    config.n_samples = 100
+    if parent.get_ref('sampler_name') != 'ARDirectSampler':
+        config.n_discard_per_chain = config.get_ref('n_samples') // 10
+    config.chunk_size = placeholder(int)
+    config.max_sampling_steps = placeholder(int)
+    config.fill_with_random = False
+    return config

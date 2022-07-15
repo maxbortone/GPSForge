@@ -40,6 +40,8 @@ def train(config: ml_collections.ConfigDict, workdir: str):
         vs = nk.vqs.MCState(sa, ma, **config.variational_state)
     elif config.variational_state_name == 'ExactState':
         vs = nk.vqs.ExactState(hi, ma)
+    elif config.variational_state_name == 'MCStateUniqeSamples':
+        vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
 
     # Optimizer
     sr = None
