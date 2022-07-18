@@ -32,8 +32,10 @@ def main(argv):
         logging.info('Using JAX XLA backend %s', jax_xla_backend)
         logging.info('Config: %s', FLAGS.config)
 
-    if FLAGS.config.trainer == 'train':
-        train.train(FLAGS.config, _WORKDIR.value)
+    if FLAGS.config.trainer == 'vmc':
+        train.vmc(FLAGS.config, _WORKDIR.value)
+    elif FLAGS.config.trainer == 'ar_state_fitting':
+        train.ar_state_fitting(FLAGS.config, _WORKDIR.value)
     else:
         raise app.UsageError(f'Unknown trainer: {FLAGS.config.trainer}')
 

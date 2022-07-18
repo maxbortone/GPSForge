@@ -11,7 +11,7 @@ from VMCutils import MPIVars, write_config, Timer
 from VMCutils import save_checkpoint, restore_checkpoint
 
 
-def train(config: ml_collections.ConfigDict, workdir: str):
+def vmc(config: ml_collections.ConfigDict, workdir: str):
     """Trains an Ansatz on a system using VMC."""
 
     # Setup system
@@ -65,7 +65,7 @@ def train(config: ml_collections.ConfigDict, workdir: str):
     if MPIVars.rank == 0:
         logging.info('Will start/continue training at initial_step=%d', initial_step)
 
-    # Variational Monte Carlo driver
+    # Driver
     vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
     # Setup logger and write config to file

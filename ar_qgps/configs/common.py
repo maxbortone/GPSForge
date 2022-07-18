@@ -14,19 +14,17 @@ def get_config() -> ConfigDict:
     config.checkpoint_every = 10
     # How often to log output to file
     config.log_every = 50
-    # Training script
-    config.trainer = 'train'
 
-    # Will be set from default.py or others
-    config.system_name = None
-    config.system = None
-    config.model_name = None
-    config.model = None
-    config.sampler_name = None
-    config.sampler = None
-    config.variational_state_name = None
-    config.variational_state = None
-    config.optimizer_name = None
-    config.optimizer = None
+    # Will be set later
+    # config.system_name = None
+    # config.system = None
+    # config.model_name = None
+    # config.model = None
+    # config.sampler_name = None
+    # config.sampler = None
+    # config.variational_state_name = None
+    # config.variational_state = None
+    # config.optimizer_name = None
+    # config.optimizer = None
 
-    return config.lock()
+    return config

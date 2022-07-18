@@ -1,5 +1,6 @@
 from ml_collections import ConfigDict
 from ar_qgps.configs import common
+from ar_qgps.configs import datasets
 from ar_qgps.configs import systems
 from ar_qgps.configs import models
 from ar_qgps.configs import samplers
@@ -12,12 +13,21 @@ def get_config(modules) -> ConfigDict:
     config = common.get_config()
     system, model, sampler, variational_state, optimizer = modules.split(',')
 
+    # Training script
+    config.trainer = 'ar_state_fitting'
+    config.mini_batch_size = 32
+
+    # Dataset
+    get_dataset_config = getattr(datasets, f"get_{system}_config")
+    config.dataset = get_dataset_config()
+
     # System
     get_system_config = getattr(systems, f"get_{system}_config")
     config.system_name = system
     config.system = get_system_config()
 
     # Model
+    assert model.startswith('AR')
     get_model_config = getattr(models, f"get_{model}_config")
     config.model_name = model
     config.model = get_model_config()
@@ -37,4 +47,4 @@ def get_config(modules) -> ConfigDict:
     config.optimizer_name = optimizer
     config.optimizer = get_optimizer_config()
 
-    return config
+    return config.lock()

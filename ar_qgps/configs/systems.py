@@ -1,6 +1,4 @@
-from ml_collections import ConfigDict, FieldReference
-from ml_collections.config_dict import placeholder
-from numpy import place
+from ml_collections import ConfigDict
 
 
 def get_Heisenberg1d_config() -> ConfigDict:

@@ -14,7 +14,7 @@ Importantly, configurations can be overwritten at the command line by specifying
 
 For example, to optimize the autoregressive qGPS on the 1D Heisenberg system with 10 sites, run
 ```
-python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/qgps.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```
 
 The list of comma separated names after the path to the configuration file correspond to class names for the system, the Ansatz, the sampler, the variational state and the optimizer respectively.
@@ -106,5 +106,5 @@ chmod +x bind_gpu.sh
 
 10. Run your job with as many ranks as available GPU devices (e.g. 4 ranks on a node with 4 GPUs):
 ```
-mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/qgps.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```
