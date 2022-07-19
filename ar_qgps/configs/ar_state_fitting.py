@@ -28,7 +28,6 @@ def get_config(modules) -> ConfigDict:
     config.system = get_system_config()
 
     # Model
-    assert model.startswith('AR')
     get_model_config = getattr(models, f"get_{model}_config")
     config.model_name = model
     config.model = get_model_config()

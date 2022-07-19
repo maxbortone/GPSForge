@@ -5,6 +5,7 @@ import numpy as np
 import netket as nk
 import qGPSKet as qk
 from absl import logging
+from optax.experimental import split_real_and_imaginary
 from ar_qgps.datasets import get_dataset
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
@@ -19,6 +20,8 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
     dataset = get_dataset(config.system_name, config.dataset)
 
     # Setup system
+    if config.dataset.basis != config.system.basis:
+        config.system.basis = config.dataset.basis
     ha = get_system(config.system_name, config.system)
     hi = ha.hilbert
     g = ha.graph if hasattr(ha, 'graph') else None
@@ -42,11 +45,12 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
         vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
 
     # Optimizer
-    sr = None
     if 'Sgd' in config.optimizer_name:
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
     elif config.optimizer_name == 'Adam':
         op = nk.optimizer.Adam(learning_rate=config.optimizer.learning_rate, b1=config.optimizer.b1, b2=config.optimizer.b2)
+    if config.model.dtype == 'complex':
+        op = split_real_and_imaginary(op)
 
     # Restore checkpoint
     parameters = vs.parameters.unfreeze()
@@ -62,7 +66,7 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
 
     # Setup logger and write config to file
     # TODO: replace JsonLog with HDF5Log
-    logger = nk.logging.JsonLog(os.path.join(workdir, f"output_{initial_step}"), save_params=False, write_every=config.log_every)
+    logger = nk.logging.JsonLog(os.path.join(workdir, f"output_{initial_step}"), save_params=True, save_params_every=config.log_every, write_every=config.log_every)
     if MPIVars.rank == 0:
         write_config(workdir, config)
         logging.info(f"Saved config at {os.path.join(workdir, 'config.yaml')}")
