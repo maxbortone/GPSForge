@@ -23,3 +23,16 @@ def get_MCStateUniqeSamples_config(parent : ConfigDict) -> ConfigDict:
     config.max_sampling_steps = placeholder(int)
     config.fill_with_random = False
     return config
+
+def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
+    config = ConfigDict()
+    config.n_samples = 100
+    config.n_random_samples = config.get_ref('n_samples') * 100
+    config.chunk_size = 1
+    config.n_discard_per_chain = 100
+    config.deterministic_set_size = 100
+    from ar_qgps.configs import datasets
+    get_dataset_config = getattr(datasets, f"get_{parent.system_name}_config")
+    config.dataset = get_dataset_config()
+    config.renormalize = False
+    return config

@@ -42,6 +42,30 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         vs = nk.vqs.ExactState(hi, ma)
     elif config.variational_state_name == 'MCStateUniqeSamples':
         vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
+    elif config.variational_state_name == 'MCStateStratifiedSampling':
+        sa = qk.sampler.MetropolisHopping(hi, n_sweeps=200, n_chains_per_rank=1)
+        if MPIVars.rank == 0:
+            from ar_qgps.datasets import get_dataset
+
+            dataset = get_dataset(config.system_name, config.variational_state.dataset)
+            det_set_size = config.variational_state.deterministic_set_size
+            norb = dataset[0].shape[1]
+            det_set = np.zeros((det_set_size, norb), dtype=np.uint8)
+            det_inds = np.argsort(np.abs(dataset[1]))[:-det_set_size-1:-1]
+            np.copyto(det_set, dataset[0][det_inds,:])
+            hilbert_size = dataset[0].shape[0]
+        else:
+            hilbert_size = None
+            det_set = None
+        hilbert_size = MPIVars.comm.bcast(hilbert_size, root=0)
+        det_set = MPIVars.comm.bcast(det_set, root=0)
+        vs = qk.vqs.MCStateStratifiedSampling(
+            det_set, hilbert_size, sa, ma,
+            number_random_samples=config.variational_state.n_random_samples,
+            n_samples=config.variational_state.n_samples,
+            chunk_size=config.variational_state.chunk_size,
+            n_discard_per_chain=config.variational_state.n_discard_per_chain,
+            renormalize=config.variational_state.renormalize)
 
     # Optimizer
     sr = None
