@@ -19,6 +19,7 @@ def get_config(modules) -> ConfigDict:
 
     # Dataset
     get_dataset_config = getattr(datasets, f"get_{system}_config")
+    config.dataset_name = system
     config.dataset = get_dataset_config()
 
     # System
