@@ -26,6 +26,7 @@ def get_MCStateUniqeSamples_config(parent : ConfigDict) -> ConfigDict:
 
 def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
+    config.n_sweeps = 100
     config.n_samples = 100
     config.n_random_samples = config.get_ref('n_samples') * 100
     config.chunk_size = 1

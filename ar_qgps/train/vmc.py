@@ -43,7 +43,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     elif config.variational_state_name == 'MCStateUniqeSamples':
         vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
     elif config.variational_state_name == 'MCStateStratifiedSampling':
-        sa = qk.sampler.MetropolisHopping(hi, n_sweeps=200, n_chains_per_rank=1)
+        sa = qk.sampler.MetropolisHopping(hi, n_sweeps=config.variational_state.n_sweeps, n_chains_per_rank=1)
         if MPIVars.rank == 0:
             from ar_qgps.datasets import get_dataset
 
