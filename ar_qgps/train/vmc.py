@@ -65,7 +65,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
             n_samples=config.variational_state.n_samples,
             chunk_size=config.variational_state.chunk_size,
             n_discard_per_chain=config.variational_state.n_discard_per_chain,
-            renormalize=config.variational_state.renormalize)
+            renormalize=config.variational_state.renormalize,
+            rand_norm=config.variational_state.rand_norm)
 
     # Optimizer
     sr = None

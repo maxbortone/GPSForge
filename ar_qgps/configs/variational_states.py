@@ -28,7 +28,7 @@ def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_sweeps = 100
     config.n_samples = 100
-    config.n_random_samples = config.get_ref('n_samples') * 100
+    config.n_random_samples = placeholder(int)
     config.chunk_size = 1
     config.n_discard_per_chain = 100
     config.deterministic_set_size = 100
@@ -36,4 +36,5 @@ def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
     get_dataset_config = getattr(datasets, f"get_{parent.system_name}_config")
     config.dataset = get_dataset_config()
     config.renormalize = False
+    config.rand_norm = False
     return config
