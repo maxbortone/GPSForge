@@ -103,11 +103,17 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
         if 'local' in config.basis:
             loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
             if 'boys' in config.basis:
-                loc_coeff = lo.Boys(mol, mo_coeff=myhf.mo_coeff).kernel()
+                loc_coeff = lo.Boys(mol, mo_coeff=loc_coeff).kernel()
             elif 'pipek-mezey' in config.basis:
-                loc_coeff = lo.PipekMezey(mol, mo_coeff=myhf.mo_coeff).kernel()
+                loc_coeff = lo.PipekMezey(mol, mo_coeff=loc_coeff).kernel()
             elif 'edmiston-ruedenberg' in config.basis:
-                loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=myhf.mo_coeff).kernel()
+                loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=loc_coeff).kernel()
+            elif 'split' in config.basis:
+                localizer = lo.Boys(mol, myhf.mo_coeff[:,:nelec//2])
+                loc_coeff_occ = localizer.kernel()
+                localizer = lo.Boys(mol, myhf.mo_coeff[:, nelec//2:])
+                loc_coeff_vrt = localizer.kernel()
+                loc_coeff = np.concatenate((loc_coeff_occ, loc_coeff_vrt), axis=1)
             ovlp = myhf.get_ovlp()
             # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
             assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
