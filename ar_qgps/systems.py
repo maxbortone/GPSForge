@@ -103,7 +103,9 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
         if 'local' in config.basis:
             loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
             if 'boys' in config.basis:
-                loc_coeff = lo.Boys(mol, mo_coeff=loc_coeff).kernel()
+                localizer = lo.Boys(mol, mo_coeff=loc_coeff)
+                localizer.init_guess = None
+                loc_coeff = localizer.kernel()
             elif 'pipek-mezey' in config.basis:
                 loc_coeff = lo.PipekMezey(mol, mo_coeff=loc_coeff).kernel()
             elif 'edmiston-ruedenberg' in config.basis:
