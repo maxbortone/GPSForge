@@ -1,4 +1,3 @@
-from fileinput import filename
 import os
 import glob
 from VMCutils import read_config

@@ -33,7 +33,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         sa_dtype = np.int8
     elif config.system_name in ['Hchain', 'H2O']:
         sa_dtype = np.uint8
-    sa = sa_cls(hi, **config.sampler, dtype=sa_dtype)
+    sa = sa_cls(hi, **config.sampler, graph=g, dtype=sa_dtype)
 
     # Variational state
     if config.variational_state_name == 'MCState':
@@ -41,7 +41,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     elif config.variational_state_name == 'ExactState':
         vs = nk.vqs.ExactState(hi, ma)
     elif config.variational_state_name == 'MCStateUniqeSamples':
-        vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
+        vs = qk.vqs.MCStateUniqueSamples(sa, ma, **config.variational_state)
     elif config.variational_state_name == 'MCStateStratifiedSampling':
         sa = qk.sampler.MetropolisHopping(hi, n_sweeps=config.variational_state.n_sweeps, n_chains_per_rank=1)
         if MPIVars.rank == 0:
