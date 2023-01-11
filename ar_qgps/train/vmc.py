@@ -1,5 +1,6 @@
 import os
 import time
+import jax
 import ml_collections
 import numpy as np
 import netket as nk
@@ -79,10 +80,13 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         op = nk.optimizer.Adam(learning_rate=config.optimizer.learning_rate, b1=config.optimizer.b1, b2=config.optimizer.b2)
     if 'SR' in config.optimizer_name:
         if 'Dense' in config.optimizer_name:
-            qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode)
+            qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift, diag_scale=config.optimizer.diag_scale)
         else:
             qgt = nk.optimizer.qgt.QGTAuto()
-        sr = nk.optimizer.SR(qgt=qgt, diag_shift=config.optimizer.diag_shift, iterative=config.optimizer.iterative)
+        sr = nk.optimizer.SR(
+            qgt,
+            solver=jax.scipy.sparse.linalg.cg # nk.optimizer.solver.LU
+        )
 
     # Restore checkpoint
     parameters = vs.parameters.unfreeze()

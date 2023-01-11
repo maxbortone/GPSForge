@@ -9,7 +9,8 @@ def get_Sgd_config() -> ConfigDict:
 def get_SgdSR_config() -> ConfigDict:
     config = ConfigDict()
     config.learning_rate = 0.01
-    config.diag_shift = 0.01
+    config.diag_shift = 0.001
+    config.diag_scale = 0.01
     config.iterative = True
     return config
 
@@ -18,7 +19,8 @@ def get_SgdSRDense_config() -> ConfigDict:
     config.learning_rate = 0.01
     config.qgt = 'QGTJacobianDense'
     config.mode = 'holomorphic'
-    config.diag_shift = 0.01
+    config.diag_shift = 0.001
+    config.diag_scale = 0.01
     config.iterative = True
     return config
 
