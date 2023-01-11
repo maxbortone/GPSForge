@@ -41,11 +41,15 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
         symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, config, graph)
     else:
         symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
+    out_trafo = get_out_transformation(name, config.apply_exp)
     if name == 'qGPS':
         ma = qk.models.qGPS(
             hilbert, config.M,
-            dtype=dtype, init_fun=init_fn,
-            to_indices=to_indices_fn, syms=(symmetries_fn, inv_symmetries_fn))
+            dtype=dtype,
+            init_fun=init_fn,
+            to_indices=to_indices_fn,
+            syms=(symmetries_fn, inv_symmetries_fn),
+            out_transformation=out_trafo)
     elif 'AR' in name:
         if isinstance(hilbert, nk.hilbert.Spin):
             count_spins_fn = count_spins
@@ -67,7 +71,8 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
                 to_indices=to_indices_fn,
                 apply_symmetries=symmetries_fn,
                 count_spins=count_spins_fn,
-                renormalize_log_psi=renormalize_log_psi_fn)
+                renormalize_log_psi=renormalize_log_psi_fn,
+                out_transformation=out_trafo)
     return ma
 
 def get_symmetry_transformation_spin(name : str, config : ConfigDict, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
@@ -216,6 +221,17 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
         log_psi
     )
     return log_psi
+
+def get_out_transformation(name: str, apply_exp: bool):
+    if name == 'qGPS':
+        axis = (-2,-1)
+    elif 'AR' in name:
+        axis = -1
+    if apply_exp:
+        out_trafo = lambda x : jnp.sum(x, axis=axis)
+    else:
+        out_trafo = lambda x : jnp.log(jnp.sum(x, axis=axis))
+    return out_trafo
 
 def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph):
     L = hilbert.size

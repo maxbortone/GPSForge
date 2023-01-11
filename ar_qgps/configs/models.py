@@ -7,6 +7,7 @@ def get_qGPS_config() -> ConfigDict:
     config.dtype = 'complex'
     config.sigma = 0.1
     config.symmetries = 'all'
+    config.apply_exp = True
     return config
 
 get_ARqGPS_config = get_qGPS_config
