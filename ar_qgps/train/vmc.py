@@ -29,11 +29,14 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         'MetropolisHopping': qk.sampler.MetropolisHopping,
         'ARDirectSampler': qk.sampler.ARDirectSampler
     }[config.get('sampler_name', 'ARDirectSampler')]
+    kwargs = config.to_dict()['sampler']
     if config.system_name in ['Heisenberg1d', 'Heisenberg2d', 'J1J22d']:
-        sa_dtype = np.int8
+        kwargs['dtype'] = np.int8
     elif config.system_name in ['Hchain', 'H2O']:
-        sa_dtype = np.uint8
-    sa = sa_cls(hi, **config.sampler, graph=g, dtype=sa_dtype)
+        kwargs['dtype'] = np.uint8
+    if config.sampler_name == 'MetropolisExchange':
+        kwargs['graph'] = g
+    sa = sa_cls(hi, **kwargs)
 
     # Variational state
     if config.variational_state_name == 'MCState':
