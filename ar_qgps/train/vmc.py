@@ -114,16 +114,23 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         t0 = time.time()
     total_steps = config.total_steps
     for step in range(initial_step, total_steps + 1):
-
+        # Training step
         vmc.advance()
-        logger(step, {"Energy": vmc._loss_stats}, vmc.state)
 
+        # Report compilation time
         if MPIVars.rank == 0 and step == initial_step:
             logging.info('First step took %.1f seconds.', time.time() - t0)
-            t0 = time.time()
 
+        # Update timer
         if MPIVars.rank == 0:
             timer.update(step)
+            wallclock = timer.elapsed_time
+        else:
+            wallclock = None
+        wallclock = MPIVars.comm.bcast(wallclock, root=0)
+
+        # Log data
+        logger(step, {"Energy": vmc._loss_stats, "Wallclock": wallclock}, vmc.state)
 
         # Report training metrics
         if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
