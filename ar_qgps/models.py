@@ -230,7 +230,7 @@ def get_out_transformation(name: str, apply_exp: bool):
     if apply_exp:
         out_trafo = lambda x : jnp.sum(x, axis=axis)
     else:
-        out_trafo = lambda x : jnp.log(jnp.sum(x, axis=axis))
+        out_trafo = lambda x : jnp.log(jnp.sum(x, axis=axis)+0.j)
     return out_trafo
 
 def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph):
