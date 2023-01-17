@@ -44,7 +44,7 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
     out_trafo = get_out_transformation(name, config.apply_exp)
     if name == 'qGPS':
         ma = qk.models.qGPS(
-            hilbert, config.M,
+            hilbert, hilbert.size*config.M,
             dtype=dtype,
             init_fun=init_fn,
             to_indices=to_indices_fn,
@@ -67,7 +67,9 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             args.extend(get_plaquettes_and_masks(hilbert, graph))
         ma = ma_cls(
                 *args,
-                dtype=dtype, init_fun=init_fn,
+                dtype=dtype,
+                init_fun=init_fn,
+                normalize=config.normalize,
                 to_indices=to_indices_fn,
                 apply_symmetries=symmetries_fn,
                 count_spins=count_spins_fn,

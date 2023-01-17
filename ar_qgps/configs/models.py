@@ -4,12 +4,16 @@ from ml_collections import ConfigDict
 def get_qGPS_config() -> ConfigDict:
     config = ConfigDict()
     config.M = 1
-    config.dtype = 'complex'
+    config.dtype = 'real'
     config.sigma = 0.1
-    config.symmetries = 'all'
+    config.symmetries = 'none'
     config.apply_exp = True
     return config
 
-get_ARqGPS_config = get_qGPS_config
-get_ARqGPSFull_config = get_qGPS_config
-get_ARPlaquetteqGPS_config = get_qGPS_config
+def get_ARqGPS_config() -> ConfigDict:
+    config = get_qGPS_config()
+    config.normalize = True
+    return config
+
+get_ARqGPSFull_config = get_ARqGPS_config
+get_ARPlaquetteqGPS_config = get_ARqGPS_config

@@ -24,6 +24,9 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     ma = get_model(config.model_name, config.model, hi, g)
 
     # Sampler
+    if hasattr(config.model, 'normalize'):
+        if not config.model.normalize and config.sampler_name == 'ARDirectSampler':
+            raise ValueError("The ARDirectSampler can only be used with normalized autoregressive models")
     sa_cls = {
         'MetropolisLocal': nk.sampler.MetropolisLocal,
         'MetropolisExchange': nk.sampler.MetropolisExchange,
