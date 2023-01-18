@@ -16,7 +16,7 @@ def get_Heisenberg2d_config() -> ConfigDict:
     config.Ly = 6
     config.J1 = 1.0
     config.pbc = True
-    config.sign_rule = (True, False)
+    config.sign_rule = True
     config.total_sz = 0
     return config
 
