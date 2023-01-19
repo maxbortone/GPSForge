@@ -37,10 +37,11 @@ def get_config(options):
 
     # If the model needs to learn a sign structure and cannot output signed amplitudes,
     # i.e. the ground state is not positive and the model is an exponential,
-    # then make sure to set the parameter dtype and the optimizer mode to complex
+    # then make sure to set the parameter dtype
     if not config.system.sign_rule and config.model.get('apply_exp', True):
         config.model.dtype = "complex"
-        config.optimizer.mode = "complex"
+    
+    config.optimizer.mode = config.model.dtype
 
     config.variational_state.seed = np.random.randint(np.iinfo(np.uint32).max)
     config.variational_state.sampler_seed = np.random.randint(np.iinfo(np.uint32).max)
