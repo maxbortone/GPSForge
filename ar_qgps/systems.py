@@ -45,8 +45,13 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     hi = nk.hilbert.Spin(0.5, total_sz=config.total_sz, N=g.n_nodes)
 
     # Setup Hamiltonian
-    J = [J1/4, J2/4] if J2 != 0.0 else J1/4
-    ha = nk.operator.Heisenberg(hi, g, J=J, sign_rule=config.sign_rule)
+    if J2 != 0.0:
+        J = [J1/4, J2/4]
+        sign_rule = (config.sign_rule, False)
+    else:
+        J = J1/4
+        sign_rule = config.sign_rule
+    ha = nk.operator.Heisenberg(hi, g, J=J, sign_rule=sign_rule)
     return ha
 
 def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
