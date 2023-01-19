@@ -12,7 +12,8 @@ def get_config(options):
         raise ValueError(
             f"{system} is not a valid option. \
             Choose one of the following: \
-            - 'Heisenberg2d' for a 2-D Heisenberg lattice \
+            - 'Heisenberg2d' for a 2-D Heisenberg lattice with Marshall Sign Rule (MSR) \
+            - 'Heisenberg2d_nomsr' for a 2-D Heisenberg lattice without (MSR) \
             - 'J1J22d' for a 2-D Heisenberg lattice with frustration")
     if variant not in ['FV', 'WS', 'FI']:
         raise ValueError(
@@ -30,6 +31,9 @@ def get_config(options):
 
     modules = f"{system},{ansatz},ARDirectSampler,MCState,SgdSRDense"
     config = vmc.get_config(modules)
+
+    if "nomsr" in system:
+        config.system.sign_rule = False
 
     # If the model needs to learn a sign structure and cannot output signed amplitudes,
     # i.e. the ground state is not positive and the model is an exponential,
