@@ -46,14 +46,10 @@ def get_config(options):
 
     if MPIVars.rank == 0:
         seed = np.random.randint(np.iinfo(np.uint32).max)
-        sampler_seed = np.random.randint(np.iinfo(np.uint32).max)
     else:
         seed = None
-        sampler_seed = None
     seed = MPIVars.comm.bcast(seed, root=0)
-    sampler_seed = MPIVars.comm.bcast(sampler_seed, root=0)
     config.variational_state.seed = seed
-    config.variational_state.sampler_seed = sampler_seed
 
     return config.lock()
 
