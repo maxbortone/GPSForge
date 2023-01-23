@@ -12,6 +12,7 @@
 # $$
 # where $Z_i = \sqrt{\sum_{x'}|\psi_i(x';x_{<i})|^2}$ is the normalization of the $i$-th local correlator.
 import numpy as np
+from VMCutils import MPIVars
 from ar_qgps.configs import vmc
 
 
@@ -60,8 +61,16 @@ def get_config(options):
     
     config.optimizer.mode = config.model.dtype
 
-    config.variational_state.seed = np.random.randint(np.iinfo(np.uint32).max)
-    config.variational_state.sampler_seed = np.random.randint(np.iinfo(np.uint32).max)
+    if MPIVars.rank == 0:
+        seed = np.random.randint(np.iinfo(np.uint32).max)
+        sampler_seed = np.random.randint(np.iinfo(np.uint32).max)
+    else:
+        seed = None
+        sampler_seed = None
+    seed = MPIVars.comm.bcast(seed, root=0)
+    sampler_seed = MPIVars.comm.bcast(sampler_seed, root=0)
+    config.variational_state.seed = seed
+    config.variational_state.sampler_seed = sampler_seed
 
     return config.lock()
 
