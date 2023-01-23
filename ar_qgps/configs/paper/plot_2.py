@@ -27,7 +27,7 @@ def get_config(options):
     elif variant == "WS":
         ansatz = "ARqGPS"
     else:
-        ansatz == "ARPlaquetteqGPS"
+        ansatz = "ARPlaquetteqGPS"
 
     modules = f"{system},{ansatz},ARDirectSampler,MCState,SgdSRDense"
     config = vmc.get_config(modules)
