@@ -36,22 +36,16 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     """
     # Setup Hilbert space
     Lx = config.Lx
-    Ly = config.get('Ly', 1)
+    Ly = config.get('Ly', None)
     J1 = config.J1
     J2 = config.get('J2', 0.0)
-    nb_order = 2 if J2 != 0.0 else 1
-    extent = [Lx, Ly] if Ly > 1 else [Lx]
-    g = nk.graph.Grid(extent, max_neighbor_order=nb_order, pbc=config.pbc)
-    hi = nk.hilbert.Spin(0.5, total_sz=config.total_sz, N=g.n_nodes)
 
     # Setup Hamiltonian
     if J2 != 0.0:
-        J = [J1/4, J2/4]
         sign_rule = (config.sign_rule, False)
     else:
-        J = J1/4
         sign_rule = config.sign_rule
-    ha = nk.operator.Heisenberg(hi, g, J=J, sign_rule=sign_rule)
+    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, sign_rule=sign_rule, on_the_fly_en=True)
     return ha
 
 def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:

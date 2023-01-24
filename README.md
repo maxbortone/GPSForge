@@ -69,9 +69,8 @@ pip install jaxlib-0.3.8+cuda11.cudnn82-cp38-none-manylinux2014_x86_64.whl
 
 4. Install [JAX](https://github.com/google/jax):
 ```
-pip install "jax>=0.3.2,<0.3.15"
+pip install "jax>=0.3.16,<0.4"
 ```
-Restriction is due to an incompatibility between NetKet and JAX (see [#1281](https://github.com/netket/netket/pull/1281))
 
 5. Install [mpi4py](https://github.com/mpi4py/mpi4py):
 ```
