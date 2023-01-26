@@ -23,7 +23,6 @@ def get_config(options):
             f"{system} is not a valid option. \
             Choose one of the following: \
             - 'Heisenberg2d' for a 2-D Heisenberg lattice with Marshall Sign Rule (MSR) \
-            - 'Heisenberg2d_nomsr' for a 2-D Heisenberg lattice without (MSR) \
             - 'J1J22d' for a 2-D Heisenberg lattice with frustration")
     if variant not in ['PS', 'MA', 'AR']:
         raise ValueError(
@@ -44,9 +43,6 @@ def get_config(options):
     
     modules = f"{system},{ansatz},{sampler},MCState,SgdSRDense"
     config = vmc.get_config(modules)
-
-    if "nomsr" in system:
-        config.system.sign_rule = False
 
     if variant == "MA":
         config.model.normalize = False
