@@ -122,7 +122,7 @@ def main(argv):
 
     # Save result
     if MPIVars.rank == 0:
-        np.savetxt(os.path.join(workdir, "spin_correlations.txt"), correlations)
+        np.savetxt(os.path.join(workdir, f"spin_correlations_{central_site}.txt"), correlations)
         logging.info(f"Saved spin correlation data at {workdir}")
 
 
