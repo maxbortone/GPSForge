@@ -163,7 +163,9 @@ def renormalize_log_psi(n_spins : Array, hilbert : HomogeneousHilbert, index : i
     Returns:
         renormalized log-amplitude (batch,)
     """
-    # TODO: extend to cases where total_sz != 0 
+    # TODO: extend to cases where total_sz != 0
+    # FIXME: can be rewritten as
+    # jnp.where(n_spins < (hilbert.size // 2), 0., -jnp.inf)
     return jnp.log(jnp.heaviside(hilbert.size//2-n_spins, 0))
 
 @partial(jax.vmap, in_axes=(0, None, None))
@@ -188,6 +190,7 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
     #    of sampling a singly occupied orbital with a spin-up (spin-down)
     #    electron, as well as the probability of sampling a doubly occupied orbital
     log_psi = jnp.zeros(hilbert.local_size)
+    # TODO: benchmark implementations on GPU with jax.lax.cond and gpu_cond
     log_psi = jax.lax.cond(
         diff[0] == 0,
         lambda log_psi: log_psi.at[1].set(-jnp.inf),
