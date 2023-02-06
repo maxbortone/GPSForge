@@ -7,5 +7,5 @@ def get_H2O_config():
     config.basis = 'canonical'
     config.method = 'fci'
     config.select_largest = placeholder(int)
-    config.datapath = "/tmp/qGPSKet_data"
+    config.datapath = "/tmp/GPSKet_data"
     return config

@@ -1,11 +1,10 @@
 import numpy as np
 import netket as nk
-import qGPSKet as qk
+import GPSKet as qk
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator, Heisenberg
-from qGPSKet.hilbert import FermionicDiscreteHilbert
-from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
-from qGPSKet.operator.hamiltonian import FermiHubbardOnTheFly
+from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
+from GPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
 from VMCutils import MPIVars
 
@@ -137,7 +136,7 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
     ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
     return ha
 
-def get_Hubbard_system(config: ConfigDict) -> ConfigDict:
+def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     """
     Return the Hamiltonian for Hubbard system at half-filling
 
@@ -154,7 +153,7 @@ def get_Hubbard_system(config: ConfigDict) -> ConfigDict:
 
     # TODO: add support for 2d system
     g = nk.graph.Chain(Lx)
-    hi = FermionicDiscreteHilbert(g.n_nodes, n_elec=(g.n_nodes//2,g.n_nodes//2))
+    hi = qk.hilbert.FermionicDiscreteHilbert(g.n_nodes, n_elec=(g.n_nodes//2,g.n_nodes//2))
 
     # Setup Hamiltonian
     edges = np.array([[i, (i+1)%Lx] for i in range(Lx)])

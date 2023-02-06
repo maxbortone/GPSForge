@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import netket as nk
-import qGPSKet as qk
+import GPSKet as qk
 from scipy.linalg import circulant
 from functools import partial
 from flax import linen as nn

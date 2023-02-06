@@ -3,7 +3,7 @@ import time
 import ml_collections
 import numpy as np
 import netket as nk
-import qGPSKet as qk
+import GPSKet as qk
 from absl import logging
 from optax.experimental import split_real_and_imaginary
 from ar_qgps.datasets import get_dataset

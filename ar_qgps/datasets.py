@@ -1,4 +1,4 @@
-import qGPSKet as qk
+import GPSKet as qk
 from typing import Union, Tuple
 from netket.utils.types import Array
 from ml_collections import ConfigDict

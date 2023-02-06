@@ -6,7 +6,7 @@ from scipy.sparse.linalg import eigsh
 from typing import Union, Tuple
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator
-from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
+from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
 from pyscf import gto, fci, scf
 
 

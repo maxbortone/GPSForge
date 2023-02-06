@@ -4,7 +4,7 @@ import jax
 import ml_collections
 import numpy as np
 import netket as nk
-import qGPSKet as qk
+import GPSKet as qk
 from absl import logging
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model

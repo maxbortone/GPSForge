@@ -7,7 +7,7 @@ import time
 import jax
 import numpy as np
 import netket as nk
-import qGPSKet as qk
+import GPSKet as qk
 from absl import app
 from absl import flags
 from absl import logging

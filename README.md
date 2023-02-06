@@ -1,11 +1,11 @@
 # AR-qGPS
 
 This repository holds the code to train and test the autoregressive form of the qGPS Ansatz, as well as its original formulation.
-Both models are implemented in [qGPSKet](https://github.com/BoothGroup/qGPSKet), a plugin for the [NetKet](https://github.com/netket/netket) framework, which uses [JAX](https://github.com/google/jax) to build machine-learning models of wavefunction Ansatze for quantum many-body problems.
+Both models are implemented in [GPSKet](https://github.com/BoothGroup/GPSKet), a plugin for the [NetKet](https://github.com/netket/netket) framework, which uses [JAX](https://github.com/google/jax) to build machine-learning models of wavefunction Ansatze for quantum many-body problems.
 
 ## Installation and Usage
 
-To train and test the qGPS models working installations of [NetKet](https://github.com/netket/netket), the plugin [qGPSKet](https://github.com/BoothGroup/qGPSKet) and the library [ml_collections](https://github.com/google/ml_collections) for configuration files are required.
+To train and test the qGPS models working installations of [NetKet](https://github.com/netket/netket), the plugin [GPSKet](https://github.com/BoothGroup/GPSKet) and the library [ml_collections](https://github.com/google/ml_collections) for configuration files are required.
 Once these are installed, clone or download this repository.
 
 The main entrypoint to train and test the models on different systems is the `main.py` script.
