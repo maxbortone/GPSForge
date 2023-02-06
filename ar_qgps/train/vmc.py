@@ -34,7 +34,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         'ARDirectSampler': qk.sampler.ARDirectSampler
     }[config.get('sampler_name', 'ARDirectSampler')]
     kwargs = config.to_dict()['sampler']
-    if config.system_name in ['Hchain', 'H2O']:
+    if config.system_name in ['Hchain', 'H2O', 'Hubbard1d']:
         kwargs['dtype'] = np.uint8
     if config.sampler_name == 'MetropolisExchange':
         kwargs['graph'] = g

@@ -26,6 +26,7 @@ Currently the following options are available:
     - `J1J22d`: two dimensional spin system with nearest neighbor and next-nearest neighbor Heisenberg interaction
     - `Hchain`: one dimensional chain of Hydrogen atoms separated by a certain interatomic distance
     - `H2O`: water molecule
+    - `Hubbard1d`: one dimensional fermionic Fermi-Hubbard system
 - Ansatz:
     - `ARqGPS`: autoregressive qGPS model with weight-sharing
     - `ARqGPSFull`: fully variational autoregressive qGPS model

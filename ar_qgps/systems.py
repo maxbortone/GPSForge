@@ -3,7 +3,9 @@ import netket as nk
 import qGPSKet as qk
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator, Heisenberg
+from qGPSKet.hilbert import FermionicDiscreteHilbert
 from qGPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
+from qGPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
 from VMCutils import MPIVars
 
@@ -23,6 +25,8 @@ def get_system(name : str, config : ConfigDict) -> AbstractOperator:
         return get_Heisenberg_system(config)
     elif name == 'Hchain' or name == 'H2O':
         return get_molecular_system(config)
+    elif 'Hubbard' in name:
+        return get_Hubbard_system(config)
 
 def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     """
@@ -131,4 +135,31 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
 
     # Setup Hamiltonian
     ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
+    return ha
+
+def get_Hubbard_system(config: ConfigDict) -> ConfigDict:
+    """
+    Return the Hamiltonian for Hubbard system at half-filling
+
+    Args:
+        config : system configuration dictionary
+
+    Returns:
+        Hamiltonian for the Hubbard system at half-filling
+    """
+    # Setup Hilbert space
+    Lx = config.Lx
+    t = config.t
+    U = config.U
+
+    # TODO: add support for 2d system
+    g = nk.graph.Chain(Lx)
+    hi = FermionicDiscreteHilbert(g.n_nodes, n_elec=(g.n_nodes//2,g.n_nodes//2))
+
+    # Setup Hamiltonian
+    edges = np.array([[i, (i+1)%Lx] for i in range(Lx)])
+    t = t*np.ones(Lx)
+    if Lx % 4 == 0:
+        t[-1] *= -1
+    ha = FermiHubbardOnTheFly(hi, edges, U=U, t=t)
     return ha

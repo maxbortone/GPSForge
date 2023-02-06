@@ -50,3 +50,10 @@ def get_H2O_config() -> ConfigDict:
     config.symmetry=False
     config.unit = 'Angstrom'
     return config
+
+def get_Hubbard1d_config() -> ConfigDict:
+    config = ConfigDict()
+    config.Lx = 10
+    config.t = 1.0
+    config.U = 1.0
+    return config
