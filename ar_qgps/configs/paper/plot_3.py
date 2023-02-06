@@ -6,7 +6,7 @@ from VMCutils import MPIVars
 from ar_qgps.configs import vmc
 
 
-def get_config(options):
+def get_config():
     modules = f"Hubbard1d,ARPlaquetteqGPS,ARDirectSampler,MCState,SgdSRDense"
     config = vmc.get_config(modules)
     config.system.Lx = 32
