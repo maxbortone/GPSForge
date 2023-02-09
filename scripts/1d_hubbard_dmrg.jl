@@ -1,16 +1,44 @@
+using ArgParse
 using ITensors
 
+
+function parse_commandline()
+    s = ArgParseSettings()
+
+    @add_arg_table s begin
+        "--N"
+            help = "Number of sites in the chain"
+            arg_type = Int
+            default = 32
+        "--t"
+            help = "Hopping strength"
+            arg_type = Float64
+            default = 1.0
+        "--U"
+            help = "Interaction strength"
+            arg_type = Float64
+            default = 1.0
+    end
+
+    return parse_args(s)
+end
+
 #
-# DMRG calculation of the 1D Hubbard model
-# ground state wavefunction, and spin densities
+# DMRG calculation of the ground state wavefunction, and spin densities
+# for the 1D Hubbard model at half-filling
 #
 
-let
-    N = 32
-    Npart = 32
-    t = 1.0
-    U = 8.0
+function main()
+    parsed_args = parse_commandline()
+    N = parsed_args["N"]
+    Npart = N
+    t = parsed_args["t"]
+    U = parsed_args["U"]
+    nsweeps = 10 #parsed_args["nsweeps"]
+    cutoff = 1E-20 #parsed_args["cutoff"]
     
+    println("Running DMRG for N=$N, t=$t and U=$U")
+
     sites = siteinds("Electron", N; conserve_qns=true)
     
     ampo = OpSum()
@@ -32,9 +60,8 @@ let
     end
     H = MPO(ampo, sites)
     
-    nsweeps = 32
-    maxdim = 1600 # [50, 100, 200, 400, 800, 800, 800, 800, 800, 800]
-    cutoff = [1E-12]
+    maxdim_sched = [50, 100, 200, 400, 800, 800, 1600, 1600, 1600]
+    cutoff_sched = [cutoff]
     
     state = ["Emp" for n in 1:N]
     p = Npart
@@ -58,7 +85,7 @@ let
     @show flux(psi0)
     
     # Start DMRG calculation:
-    energy, psi = dmrg(H, psi0; nsweeps, maxdim, cutoff)
+    energy, psi = dmrg(H, psi0; nsweeps, maxdim_sched, cutoff_sched)
     
     upd = fill(0.0, N)
     dnd = fill(0.0, N)
@@ -89,3 +116,5 @@ let
     
     println("\nGround State Energy = $energy")
 end
+
+main()
