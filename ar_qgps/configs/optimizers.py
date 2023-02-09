@@ -24,6 +24,13 @@ def get_SgdSRDense_config() -> ConfigDict:
     config.iterative = True
     return config
 
+def get_SgdminSR_config() -> ConfigDict:
+    config = ConfigDict()
+    config.learning_rate = 0.01
+    config.mode = 'holomorphic'
+    config.rcond = 1e-12
+    return config
+
 def get_Adam_config() -> ConfigDict:
     config = ConfigDict()
     config.learning_rate = 0.01

@@ -69,7 +69,6 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             apply_symmetries = (symmetries_fn, inv_symmetries_fn)
         else:
             apply_symmetries = symmetries_fn
-        print(apply_symmetries)
         ma = ma_cls(
                 *args,
                 dtype=dtype,

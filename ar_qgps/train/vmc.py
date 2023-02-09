@@ -5,6 +5,7 @@ import ml_collections
 import numpy as np
 import netket as nk
 import GPSKet as qk
+import jax.numpy as jnp
 from absl import logging
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
@@ -99,7 +100,11 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         logging.info('Will start/continue training at initial_step=%d', initial_step)
 
     # Driver
-    vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
+    if 'minSR' in config.optimizer_name:
+        solver = lambda x: jnp.linalg.pinv(x, rcond=config.optimizer.rcond, hermitian=True)
+        vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
+    else:
+        vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
     # Setup logger and write config to file
     # TODO: replace JsonLog with HDF5Log
