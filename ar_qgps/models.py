@@ -32,11 +32,6 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
     elif config.dtype == 'complex':
         dtype = jnp.complex128
     init_fn = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
-    if isinstance(hilbert, nk.hilbert.Spin):
-        # Maps [-1, 1] to [0, 1]
-        to_indices_fn = lambda x: jnp.asarray((x+hilbert.local_size-1)/2, jnp.int8)
-    else:
-        to_indices_fn = lambda x: x.astype(jnp.uint8)
     if graph:
         symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, config, graph)
     else:
@@ -47,7 +42,6 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             hilbert, hilbert.size*config.M,
             dtype=dtype,
             init_fun=init_fn,
-            to_indices=to_indices_fn,
             syms=(symmetries_fn, inv_symmetries_fn),
             out_transformation=out_trafo)
     elif 'AR' in name:
@@ -74,7 +68,6 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
                 dtype=dtype,
                 init_fun=init_fn,
                 normalize=config.normalize,
-                to_indices=to_indices_fn,
                 apply_symmetries=apply_symmetries,
                 count_spins=count_spins_fn,
                 renormalize_log_psi=renormalize_log_psi_fn,
