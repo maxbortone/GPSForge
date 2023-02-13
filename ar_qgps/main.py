@@ -4,6 +4,7 @@ from absl import flags
 from absl import logging
 from ml_collections import config_flags
 from ar_qgps import train
+from ar_qgps.configs.common import resolve
 from VMCutils import MPIVars, add_file_logger
 
 
@@ -22,6 +23,8 @@ flags.mark_flags_as_required(['config', 'workdir'])
 def main(argv):
     if len(argv) > 1:
         raise app.UsageError('Too many command-line arguments.')
+
+    config = resolve(FLAGS.config)
 
     if MPIVars.rank == 0:
         add_file_logger(_WORKDIR.value, basename=FLAGS.config.trainer)

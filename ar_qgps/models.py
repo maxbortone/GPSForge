@@ -31,6 +31,11 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
         dtype = jnp.float64
     elif config.dtype == 'complex':
         dtype = jnp.complex128
+    if isinstance(config.M, tuple):
+        assert len(config.M) == hilbert.size
+        M = HashableArray(np.array(config.M))
+    else:
+        M = int(config.M)
     init_fn = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
     if graph:
         symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, config, graph)
@@ -39,7 +44,7 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
     out_trafo = get_out_transformation(name, config.apply_exp)
     if name == 'qGPS':
         ma = qk.models.qGPS(
-            hilbert, hilbert.size*config.M,
+            hilbert, hilbert.size*M,
             dtype=dtype,
             init_fun=init_fn,
             syms=(symmetries_fn, inv_symmetries_fn),
@@ -56,7 +61,7 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
             'ARqGPSFull': qk.models.ARqGPSFull,
             'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
         }[name]
-        args = [hilbert, config.M]
+        args = [hilbert, M]
         if 'Plaquette' in name:
             args.extend(get_plaquettes_and_masks(hilbert, graph))
         if 'Full' in name:

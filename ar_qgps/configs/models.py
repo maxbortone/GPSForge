@@ -3,7 +3,8 @@ from ml_collections import ConfigDict
 
 def get_qGPS_config() -> ConfigDict:
     config = ConfigDict()
-    config.M = 1
+    # Parse support dimension later, allow int as well as tuples
+    config.M = '1'
     config.dtype = 'real'
     config.sigma = 0.1
     config.symmetries = 'none'
