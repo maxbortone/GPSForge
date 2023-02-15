@@ -34,8 +34,7 @@ function main()
     Npart = N
     t = parsed_args["t"]
     U = parsed_args["U"]
-    nsweeps = 10 #parsed_args["nsweeps"]
-    cutoff = 1E-20 #parsed_args["cutoff"]
+    nsweeps = 10
     
     println("Running DMRG for N=$N, t=$t and U=$U")
 
@@ -60,8 +59,9 @@ function main()
     end
     H = MPO(ampo, sites)
     
-    maxdim_sched = [50, 100, 200, 400, 800, 800, 1600, 1600, 1600]
-    cutoff_sched = [cutoff]
+    maxdim = [10, 20, 80, 200, 300, 400, 400, 800, 800, 1600]
+    cutoff = [1E-5, 1E-6, 1E-7, 1E-8, 1E-8, 1E-8, 1E-8, 1E-8, 1E-8, 1E-8]
+    noise = [1E-5, 1E-5, 1E-8, 1E-9, 1E-10, 1E-10, 1E-10, 1E-10, 1E-10, 1E-10]
     
     state = ["Emp" for n in 1:N]
     p = Npart
@@ -85,7 +85,7 @@ function main()
     @show flux(psi0)
     
     # Start DMRG calculation:
-    energy, psi = dmrg(H, psi0; nsweeps, maxdim_sched, cutoff_sched)
+    energy, psi = dmrg(H, psi0; nsweeps, maxdim, cutoff, noise)
     
     upd = fill(0.0, N)
     dnd = fill(0.0, N)
