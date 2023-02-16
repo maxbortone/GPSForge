@@ -36,6 +36,29 @@ def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperat
         exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
     return exact_energy
 
+def get_Hubbard_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
+    """
+    Returns the exact energy for a Hubbard system defined by `config` if present in ./data folder,
+    else attempts to diagonalize the Hamiltonian.
+    If this also fails, returns None
+    """
+    exact_energy = None
+    base_path = pathlib.Path(__file__).parent.parent.resolve()
+    Lx = config.Lx
+    Ly = config.get('Ly', 1)
+    t = config.t
+    U = config.U
+    if Ly == 1:
+        path = os.path.join(base_path, 'data/result_DMRG_Hubbard_1D.csv')
+        df = pd.read_csv(path, dtype={'L': np.int16, 't': np.float32, 'U': np.float32, 'BC': str, 'M_max': np.int32, 'E': np.float32})
+        row = df.query('L == @Lx and t == @t and U == @U')
+        exact_energy = row['E'].values[0]
+    else:
+        raise ValueError("No data available for 2D Hubbard systems.")
+    if exact_energy is None and hamiltonian is not None:
+        exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
+    return exact_energy
+
 def get_molecular_exact_energy(config: ConfigDict, hamiltonian: AbInitioHamiltonianOnTheFly) -> Tuple[float, float]:
     """
     Returns the exact energy for a molecular system defined by `config` and `hamiltonian`, computed with a FCI solver
