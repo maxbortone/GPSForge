@@ -75,19 +75,25 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
             rand_norm=config.variational_state.rand_norm)
 
     # Optimizer
-    sr = None
-    if 'Sgd' in config.optimizer_name:
+    if config.optimizer_name == 'Sgd':
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
+        sr = None
     elif config.optimizer_name == 'Adam':
         op = nk.optimizer.Adam(learning_rate=config.optimizer.learning_rate, b1=config.optimizer.b1, b2=config.optimizer.b2)
-    if 'SR' in config.optimizer_name:
-        if 'Dense' in config.optimizer_name:
-            qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift, diag_scale=config.optimizer.diag_scale)
-        else:
-            qgt = nk.optimizer.qgt.QGTAuto()
-        sr = nk.optimizer.SR(
+        sr = None
+    elif config.optimizer_name == 'SRDense':
+        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
+        qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift, diag_scale=config.optimizer.diag_scale)
+        sr = qk.optimizer.SRDense(qgt)
+    elif config.optimizer_name == 'SRRMSProp':
+        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
+        qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode)
+        sr = qk.optimizer.SRRMSProp(
+            vs.parameters,
             qgt,
-            solver=jax.scipy.sparse.linalg.cg # nk.optimizer.solver.LU
+            diag_shift=config.optimizer.diag_shift,
+            decay=config.optimizer.decay,
+            eps=config.optimizer.eps
         )
 
     # Restore checkpoint

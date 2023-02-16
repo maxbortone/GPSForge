@@ -14,7 +14,7 @@ Importantly, configurations can be overwritten at the command line by specifying
 
 For example, to optimize the autoregressive qGPS on the 1D Heisenberg system with 10 sites, run
 ```
-python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```
 
 The list of comma separated names after the path to the configuration file correspond to class names for the system, the Ansatz, the sampler, the variational state and the optimizer respectively.
@@ -40,9 +40,9 @@ Currently the following options are available:
     - `ExactState`: exact quantum state (computes expectation values over the whole Hilbert space)
 - Optimizer:
     - `Sgd`: Stochastic gradient descent optimizer
-    - `SgdSR`: Stochastic gradient descent optimizer with Stochastic Reconfiguration preconditioning of gradients (uses the on-the-fly Quantum Geometric Tensor)
-    - `SgdSRDense`: same as the above, but with the dense version of the QGT
     - `Adam`: Adam optimizer
+    - `SRDense`: Stochastic gradient descent optimizer with Stochastic Reconfiguration preconditioning of gradients (uses the dense Quantum Geometric Tensor)
+    - `SRRMSProp`: SR with RMSProp diagonal shift
 
 ## Setup on GPU nodes
 To run code on GPU nodes in a HPC cluster, follow these steps.
