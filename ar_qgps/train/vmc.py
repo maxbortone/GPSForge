@@ -75,7 +75,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
             rand_norm=config.variational_state.rand_norm)
 
     # Optimizer
-    if config.optimizer_name == 'Sgd':
+    if config.optimizer_name == 'Sgd' or config.optimizer_name == 'minSR':
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         sr = None
     elif config.optimizer_name == 'Adam':
