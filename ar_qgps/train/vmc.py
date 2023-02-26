@@ -42,6 +42,13 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     sa = sa_cls(hi, **kwargs)
 
     # Variational state
+    if config.variational_state_name != 'ExactState':
+        if MPIVars.rank == 0:
+            seed = np.random.randint(np.iinfo(np.uint32).max)
+        else:
+            seed = None
+        seed = MPIVars.comm.bcast(seed, root=0)
+        config.variational_state.seed = seed
     if config.variational_state_name == 'MCState':
         vs = nk.vqs.MCState(sa, ma, **config.variational_state)
     elif config.variational_state_name == 'ExactState':

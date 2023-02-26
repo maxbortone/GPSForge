@@ -41,7 +41,7 @@ def get_config(options):
     else:
         sampler = "MetropolisExchange"
     
-    modules = f"{system},{ansatz},{sampler},MCState,SgdSRDense"
+    modules = f"{system},{ansatz},{sampler},MCState,SRRMSProp"
     config = vmc.get_config(modules)
 
     if variant == "MA":
@@ -56,13 +56,6 @@ def get_config(options):
         config.model.dtype = "complex"
     
     config.optimizer.mode = config.model.dtype
-
-    if MPIVars.rank == 0:
-        seed = np.random.randint(np.iinfo(np.uint32).max)
-    else:
-        seed = None
-    seed = MPIVars.comm.bcast(seed, root=0)
-    config.variational_state.seed = seed
 
     return config.lock()
 

@@ -2,8 +2,6 @@
 # The fully-variational autoregressive formulation above has cost $\mathcal{O}(L^2)$. This can be reduced by a factor of $\mathcal{O}(L)$ using one of these two strategies:
 # 1. share weights between subsequent local correlators, i.e. parametrize them as $\psi_i = \psi_{\theta_{<i}}$
 # 2. use the same translationally-invariant correlator for each site, i.e. $\psi_i = \psi_0$
-import numpy as np
-from VMCutils import MPIVars
 from ar_qgps.configs import vmc
 
 
@@ -29,7 +27,7 @@ def get_config(options):
     else:
         ansatz = "ARPlaquetteqGPS"
 
-    modules = f"{system},{ansatz},ARDirectSampler,MCState,SgdSRDense"
+    modules = f"{system},{ansatz},ARDirectSampler,MCState,SRRMSProp"
     config = vmc.get_config(modules)
 
     # If the model needs to learn a sign structure and cannot output signed amplitudes,
@@ -39,13 +37,6 @@ def get_config(options):
         config.model.dtype = "complex"
     
     config.optimizer.mode = config.model.dtype
-
-    if MPIVars.rank == 0:
-        seed = np.random.randint(np.iinfo(np.uint32).max)
-    else:
-        seed = None
-    seed = MPIVars.comm.bcast(seed, root=0)
-    config.variational_state.seed = seed
 
     return config.lock()
 
