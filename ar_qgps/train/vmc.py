@@ -42,7 +42,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     sa = sa_cls(hi, **kwargs)
 
     # Variational state
-    if config.variational_state_name != 'ExactState':
+    if config.variational_state_name != 'ExactState' and config.variational_state.seed is None:
         if MPIVars.rank == 0:
             seed = np.random.randint(np.iinfo(np.uint32).max)
         else:
@@ -82,7 +82,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
             rand_norm=config.variational_state.rand_norm)
 
     # Optimizer
-    if config.optimizer_name == 'Sgd' or config.optimizer_name == 'minSR':
+    if config.optimizer_name == 'Sgd':
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         sr = None
     elif config.optimizer_name == 'Adam':
@@ -113,7 +113,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         logging.info('Will start/continue training at initial_step=%d', initial_step)
 
     # Driver
-    if 'minSR' in config.optimizer_name:
+    if config.optimizer_name == 'minSR':
+        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         solver = lambda x: jnp.linalg.pinv(x, rcond=config.optimizer.rcond, hermitian=True)
         vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
     else:
