@@ -31,11 +31,14 @@ def get_config() -> ConfigDict:
 
 def resolve(config: ConfigDict) -> ConfigDict:
     # Support dimension can be int or tuple
-    M = config.model.M.split(',')
-    if len(M) > 1:
-        M = tuple(map(int, M))
+    if isinstance(config.model.M, str):
+        M = config.model.M.split(',')
+        if len(M) > 1:
+            M = tuple(map(int, M))
+        else:
+            M = int(M[0])
     else:
-        M = int(M[0])
+        M = int(config.model.M)
     with config.ignore_type():
         config.model.M = M
     config = config.copy_and_resolve_references()
