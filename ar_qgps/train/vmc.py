@@ -94,13 +94,17 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         sr = qk.optimizer.SRDense(qgt)
     elif config.optimizer_name == 'SRRMSProp':
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
-        qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode)
+        pars_struct = jax.tree_map(
+            lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vs.parameters
+        )
+        # TODO: allow different solvers and QGTs, e.g. cg and QGTOnTheFly
         sr = qk.optimizer.SRRMSProp(
-            vs.parameters,
-            qgt,
+            pars_struct,
+            qk.optimizer.qgt.QGTJacobianDenseRMSProp,
             diag_shift=config.optimizer.diag_shift,
             decay=config.optimizer.decay,
-            eps=config.optimizer.eps
+            eps=config.optimizer.eps,
+            mode=config.optimizer.mode
         )
 
     # Restore checkpoint
@@ -133,6 +137,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         timer = Timer(config.total_steps)
         t0 = time.time()
     total_steps = config.total_steps
+    # TODO: implement saving of best parameters
+    # NOTE: energy can sometimes be lower than GS energy
     for step in range(initial_step, total_steps + 1):
         # Training step
         vmc.advance()
