@@ -10,7 +10,7 @@ from absl import logging
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
 from VMCutils import MPIVars, write_config, Timer
-from VMCutils import save_checkpoint, restore_checkpoint
+from VMCutils import save_checkpoint, restore_checkpoint, save_best_params
 
 
 def vmc(config: ml_collections.ConfigDict, workdir: str):
@@ -140,9 +140,9 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         logging.info('Starting training loop; initial compile can take a while...')
         timer = Timer(config.total_steps)
         t0 = time.time()
+        best_energy = np.inf
+        best_variance = np.inf
     total_steps = config.total_steps
-    # TODO: implement saving of best parameters
-    # NOTE: energy can sometimes be lower than GS energy
     for step in range(initial_step, total_steps + 1):
         # Training step
         vmc.advance()
@@ -161,6 +161,13 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
 
         # Log data
         logger(step, {"Energy": vmc._loss_stats, "Wallclock": wallclock}, vmc.state)
+
+        # Save best energy params
+        if MPIVars.rank == 0 and vmc.energy.mean.real < best_energy and vmc.energy.variance < best_variance:
+            best_energy = vmc.energy.mean.real
+            best_variance = vmc.energy.variance
+            save_best_params(workdir, vmc.state.parameters)
+            logging.info(f"Stored best parameters at step {step} with energy {vmc.energy}")
 
         # Report training metrics
         if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
