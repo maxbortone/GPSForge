@@ -28,6 +28,7 @@ def get_SRRMSProp_config() -> ConfigDict:
     config.diag_shift = 0.01
     config.decay = 0.9
     config.eps = 1e-8
+    config.solver = 'cg'
     return config
 
 def get_minSR_config() -> ConfigDict:

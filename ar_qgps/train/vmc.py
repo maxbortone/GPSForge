@@ -97,14 +97,18 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         pars_struct = jax.tree_map(
             lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vs.parameters
         )
-        # TODO: allow different solvers and QGTs, e.g. cg and QGTOnTheFly
+        if config.optimizer.solver == 'pinv':
+            solver = qk.optimizer.pinv
+        elif config.optimizer.solver == 'cg':
+            solver = jax.scipy.sparse.linalg.cg
         sr = qk.optimizer.SRRMSProp(
             pars_struct,
             qk.optimizer.qgt.QGTJacobianDenseRMSProp,
             diag_shift=config.optimizer.diag_shift,
             decay=config.optimizer.decay,
             eps=config.optimizer.eps,
-            mode=config.optimizer.mode
+            mode=config.optimizer.mode,
+            solver=solver
         )
 
     # Restore checkpoint
