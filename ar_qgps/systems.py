@@ -48,7 +48,7 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
         sign_rule = (config.sign_rule, False)
     else:
         sign_rule = config.sign_rule
-    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, sign_rule=sign_rule, on_the_fly_en=True)
+    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
 def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
