@@ -7,3 +7,4 @@ notebooks/
 profiles/
 tmp/
 *.out
+*.code-workspace
