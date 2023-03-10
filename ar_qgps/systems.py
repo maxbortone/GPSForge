@@ -152,13 +152,13 @@ def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     U = config.U
 
     # TODO: add support for 2d system
-    g = nk.graph.Chain(Lx)
+    g = nk.graph.Chain(Lx, pbc=config.pbc)
     hi = qk.hilbert.FermionicDiscreteHilbert(g.n_nodes, n_elec=(g.n_nodes//2,g.n_nodes//2))
 
     # Setup Hamiltonian
     edges = np.array([[i, (i+1)%Lx] for i in range(Lx)])
     t = t*np.ones(Lx)
-    if Lx % 4 == 0:
+    if config.pbc and Lx % 4 == 0:
         t[-1] *= -1
     ha = FermiHubbardOnTheFly(hi, edges, U=U, t=t)
     return ha

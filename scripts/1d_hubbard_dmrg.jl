@@ -18,6 +18,10 @@ function parse_commandline()
             help = "Interaction strength"
             arg_type = Float64
             default = 1.0
+        "--pbc"
+            help = "Periodic boundary conditions"
+            arg_type = Bool
+            default = true
     end
 
     return parse_args(s)
@@ -34,6 +38,7 @@ function main()
     Npart = N
     t = parsed_args["t"]
     U = parsed_args["U"]
+    pbc = parsed_args["pbc"]
     nsweeps = 10
     
     println("Running DMRG for N=$N, t=$t and U=$U")
@@ -47,13 +52,15 @@ function main()
         ampo += -t, "Cdagdn", b, "Cdn", b + 1
         ampo += -t, "Cdagdn", b + 1, "Cdn", b
     end
-    if N % 4 == 0
+    if pbc && N % 4 == 0
         t *= -1
     end
-    ampo += -t, "Cdagup", N, "Cup", 1
-    ampo += -t, "Cdagup", 1, "Cup", N
-    ampo += -t, "Cdagdn", N, "Cdn", 1
-    ampo += -t, "Cdagdn", 1, "Cdn", N
+    if pbc
+        ampo += -t, "Cdagup", N, "Cup", 1
+        ampo += -t, "Cdagup", 1, "Cup", N
+        ampo += -t, "Cdagdn", N, "Cdn", 1
+        ampo += -t, "Cdagdn", 1, "Cdn", N
+    end
     for i in 1:N
         ampo += U, "Nupdn", i
     end

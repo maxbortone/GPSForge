@@ -56,4 +56,5 @@ def get_Hubbard1d_config() -> ConfigDict:
     config.Lx = 10
     config.t = 1.0
     config.U = 1.0
+    config.pbc = True
     return config
