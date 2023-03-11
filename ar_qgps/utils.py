@@ -48,10 +48,11 @@ def get_Hubbard_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=
     Ly = config.get('Ly', 1)
     t = config.t
     U = config.U
+    bc = "APBC" if config.pbc else "OBC"
     if Ly == 1:
         path = os.path.join(base_path, 'data/result_DMRG_Hubbard_1D.csv')
         df = pd.read_csv(path, dtype={'L': np.int16, 't': np.float32, 'U': np.float32, 'BC': str, 'M_max': np.int32, 'E': np.float32})
-        row = df.query('L == @Lx and t == @t and U == @U')
+        row = df.query('L == @Lx and t == @t and U == @U and BC == @bc')
         exact_energy = row['E'].values[0]
     else:
         raise ValueError("No data available for 2D Hubbard systems.")
