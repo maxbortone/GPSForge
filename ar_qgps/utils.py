@@ -22,6 +22,7 @@ def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperat
     Ly = config.get('Ly', 1)
     J1 = config.J1
     J2 = config.get('J2', 0.0)
+    bc = "PBC" if config.pbc else "OBC"
     if Ly == 1:
         path = os.path.join(base_path, 'data/result_DMRG_Heisenberg_1D.csv')
         df = pd.read_csv(path, dtype={'L': np.int16, 'J': np.float32, 'E': np.float32})
@@ -29,8 +30,8 @@ def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperat
         exact_energy = row['E'].values[0]
     else:
         path = os.path.join(base_path, 'data/result_ED_J1J2_2D.csv')
-        df = pd.read_csv(path, skiprows=0, header=1, dtype={'Lx': np.int16, 'Ly': np.int16, 'J1': np.float32, 'J2': np.float32, 'E/N': np.float32, 'E': np.float32})
-        row = df.query('Lx == @Lx and Ly == @Ly and J1 == @J1 and J2 == @ J2')
+        df = pd.read_csv(path, skiprows=0, header=1, dtype={'Lx': np.int16, 'Ly': np.int16, 'J1': np.float32, 'J2': np.float32, 'BC': str, 'E/N': np.float32, 'E': np.float32})
+        row = df.query('Lx == @Lx and Ly == @Ly and J1 == @J1 and J2 == @ J2 and BC == @bc')
         exact_energy = row['E'].values[0]
     if exact_energy is None and hamiltonian is not None:
         exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
