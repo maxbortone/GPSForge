@@ -28,15 +28,18 @@ Currently the following options are available:
     - `H2O`: water molecule
     - `Hubbard1d`: one dimensional fermionic Fermi-Hubbard system
 - Ansatz:
-    - `ARqGPS`: autoregressive qGPS model with weight-sharing
     - `ARqGPSFull`: fully variational autoregressive qGPS model
+    - `ARPlaquetteqGPS`: filter-based autoregressive qGPS model
+    - `ARqGPS`: autoregressive qGPS model with weight-sharing
     - `qGPS`: qGPS model
 - Sampler:
     - `ARDirectSampler`: direct sampler for autoregressive models
     - `MetropolisExchange`: Metropolis sampler with exchange rule for spin systems
-    - `MetropolisLocal`: Metropolis sampler with local rule for spin systems
+    - `MetropolisHopping`: Metropolis sampler with hopping rule for fermionic systems
 - Variational state:
     - `MCState`: Monte Carlo variational quantum state
+    - `MCStateUniqueSamples`: Monte Carlo variational quantum state with support for unique samples
+    - `MCStateStratifiedSampling`: Monte Carlo variational quantum state with support for stratified sampling
     - `ExactState`: exact quantum state (computes expectation values over the whole Hilbert space)
 - Optimizer:
     - `Sgd`: Stochastic gradient descent optimizer
@@ -61,40 +64,34 @@ conda create --name qgps-gpu python=3.8
 conda activate qgps-gpu
 ```
 
-3. Download and install the correct version of `jaxlib` (e.g. CUDA11, CuDNN 8.2 and Python 3.8):
+3. Install [JAX](https://github.com/google/jax):
 ```
 pip install --upgrade pip
-wget -v https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.3.8+cuda11.cudnn82-cp38-none-manylinux2014_x86_64.whl
-pip install jaxlib-0.3.8+cuda11.cudnn82-cp38-none-manylinux2014_x86_64.whl
+pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-4. Install [JAX](https://github.com/google/jax):
-```
-pip install "jax>=0.3.16,<0.4"
-```
-
-5. Install [mpi4py](https://github.com/mpi4py/mpi4py):
+4. Install [mpi4py](https://github.com/mpi4py/mpi4py):
 ```
 pip install mpi4py
 ```
 
-6. Install [mpi4jax](https://github.com/mpi4jax/mpi4jax):
+5. Install [mpi4jax](https://github.com/mpi4jax/mpi4jax):
 ```
 pip install cython
 pip install mpi4jax --no-build-isolation
 ```
 
-7. Install [NetKet](https://github.com/netket/netket) with MPI support:
+6. Install [NetKet](https://github.com/netket/netket) with MPI support:
 ```
 pip install "netket[mpi]"
 ```
 
-8. Install [ml-collections](https://github.com/google/ml_collections):
+7. Install [ml-collections](https://github.com/google/ml_collections):
 ```
 pip install ml-collections
 ```
 
-9. Create a bash script that binds GPU devices to individual MPI ranks:
+8. Create a bash script that binds GPU devices to individual MPI ranks:
 ```
 cat << EOF > bind_gpu.sh
 #!/bin/bash
@@ -105,7 +102,7 @@ EOF
 chmod +x bind_gpu.sh
 ```
 
-10. Run your job with as many ranks as available GPU devices (e.g. 4 ranks on a node with 4 GPUs):
+9. Run your job with as many ranks as available GPU devices (e.g. 4 ranks on a node with 4 GPUs):
 ```
-mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SgdSRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```

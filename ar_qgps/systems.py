@@ -9,23 +9,23 @@ from pyscf import scf, gto, ao2mo, lo
 from VMCutils import MPIVars
 
 
-def get_system(name : str, config : ConfigDict) -> AbstractOperator:
+def get_system(config : ConfigDict) -> AbstractOperator:
     """
     Return the Hamiltonian for a system
 
     Args:
-        name : name of the system
-        config : system configuration dictionary
+        config : experiment configuration file
 
     Returns:
         Hamiltonian for the system
     """
+    name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
-        return get_Heisenberg_system(config)
+        return get_Heisenberg_system(config.system)
     elif name == 'Hchain' or name == 'H2O':
-        return get_molecular_system(config)
+        return get_molecular_system(config.system)
     elif 'Hubbard' in name:
-        return get_Hubbard_system(config)
+        return get_Hubbard_system(config.system)
 
 def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     """

@@ -14,36 +14,49 @@ from ml_collections import ConfigDict
 from typing import Union, Tuple, Callable, Optional
 
 
-def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None) -> nn.Module:
+_MODELS = {
+    'qGPS': qk.models.qGPS,
+    'ARqGPS': qk.models.ARqGPS,
+    'ARqGPSFull': qk.models.ARqGPSFull,
+    'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
+}
+
+def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None) -> nn.Module:
     """
     Return the model for a wavefunction Ansatz
 
     Args:
-        name : wavefunction Ansatz name
-        config : model configuration dictionary
+        config : experiment configuration file
         hilbert : Hilbert space on which the model should act
         graph : graph associated with the Hilbert space (optional)
 
     Returns:
         the model for the wavefunction Ansatz
     """
-    if config.dtype == 'real':
+    name = config.model_name
+    try:
+        ma_cls = _MODELS[name]
+    except KeyError:
+        raise ValueError(f"Model {name} is not a valid class or is not supported yet.")
+    if config.model.dtype == 'real':
         dtype = jnp.float64
-    elif config.dtype == 'complex':
+    elif config.model.dtype == 'complex':
         dtype = jnp.complex128
-    if isinstance(config.M, tuple):
-        assert len(config.M) == hilbert.size
+    if isinstance(config.model.M, tuple):
+        assert len(config.model.M) == hilbert.size
         M = HashableArray(np.array(config.M))
     else:
-        M = int(config.M)
-    init_fn = qk.nn.initializers.normal(sigma=config.sigma, dtype=dtype)
+        M = int(config.model.M)
+    init_fn = qk.nn.initializers.normal(sigma=config.model.sigma, dtype=dtype)
     if graph:
-        symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, config, graph)
+        automorphisms = config.model.symmetries in ['all', 'automorphisms']
+        spin_flip = config.model.symmetries in ['all', 'spin-flip']
+        symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, automorphisms, spin_flip, graph)
     else:
         symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
-    out_trafo = get_out_transformation(name, config.apply_exp)
+    out_trafo = get_out_transformation(name, config.model.apply_exp)
     if name == 'qGPS':
-        ma = qk.models.qGPS(
+        ma = ma_cls(
             hilbert, hilbert.size*M,
             dtype=dtype,
             init_fun=init_fn,
@@ -56,11 +69,6 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
         elif isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
             count_spins_fn = count_spins_fermionic
             renormalize_log_psi_fn = renormalize_log_psi_fermionic
-        ma_cls = {
-            'ARqGPS': qk.models.ARqGPS,
-            'ARqGPSFull': qk.models.ARqGPSFull,
-            'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
-        }[name]
         args = [hilbert, M]
         if 'Plaquette' in name:
             args.extend(get_plaquettes_and_masks(hilbert, graph))
@@ -72,27 +80,26 @@ def get_model(name : str, config : ConfigDict, hilbert : HomogeneousHilbert, gra
                 *args,
                 dtype=dtype,
                 init_fun=init_fn,
-                normalize=config.normalize,
+                normalize=config.model.normalize,
                 apply_symmetries=apply_symmetries,
                 count_spins=count_spins_fn,
                 renormalize_log_psi=renormalize_log_psi_fn,
                 out_transformation=out_trafo)
     return ma
 
-def get_symmetry_transformation_spin(name : str, config : ConfigDict, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
+def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
     """
     Return the appropriate spin symmetry transformations
     
     Args:
-        name : name of the model Ansatz
-        config : model configuration dictionary
+        name : name of the Ansatz
+        autormophisms : whether to include autormophisms or not
+        spin_flip : whether to include spin_flip symmetry or not
         graph : underlying graph of the system
 
     Returns:
         spin symmetry transformations. For the qGPS Ansatz also the inverse transformations are returned
     """
-    automorphisms = config.symmetries in ['all', 'automorphisms']
-    spin_flip = config.symmetries in ['all', 'spin-flip']
     if name == 'qGPS':
         return qk.models.get_sym_transformation_spin(graph, automorphisms, spin_flip)
     elif 'AR' in name:
@@ -255,6 +262,16 @@ def renormalize_log_psi_fermionic(n_spins : Array, hilbert : HomogeneousHilbert,
     return log_psi
 
 def get_out_transformation(name: str, apply_exp: bool):
+    """
+    Return the transformation of the ouput layer
+
+    Args:
+        name : name of the Ansatz
+        apply_exp : whether to apply the exponential or not
+
+    Returns:
+        a callable function that is applied in the output layer of a GPS model
+    """
     if name == 'qGPS':
         axis = (-2,-1)
     elif 'AR' in name:
@@ -266,6 +283,16 @@ def get_out_transformation(name: str, apply_exp: bool):
     return out_trafo
 
 def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph):
+    """
+    Return the filter plaquettes and masks for a filter-based GPS Ansatz
+
+    Args:
+        hilbert : Hilbert space on which the model should act
+        graph : graph associated with the Hilbert space
+
+    Returns:
+        a tuple containing the filter plaquettes and masks for a filter-based GPS Ansatz
+    """
     L = hilbert.size
     if graph and graph.ndim == 2:
         # TODO: maybe replace this code with a double for loop over lattice coordinates

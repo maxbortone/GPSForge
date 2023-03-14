@@ -19,6 +19,7 @@ def get_SRDense_config() -> ConfigDict:
     config.mode = 'real'
     config.diag_shift = 0.001
     config.diag_scale = 0.01
+    config.solver = 'cg'
     return config
 
 def get_SRRMSProp_config() -> ConfigDict:

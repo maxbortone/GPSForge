@@ -9,6 +9,9 @@ import jax.numpy as jnp
 from absl import logging
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
+from ar_qgps.samplers import get_sampler
+from ar_qgps.variational_states import get_variational_state
+from ar_qgps.optimizers import get_optimizer
 from VMCutils import MPIVars, write_config, Timer
 from VMCutils import save_checkpoint, restore_checkpoint, save_best_params
 
@@ -17,99 +20,21 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     """Trains an Ansatz on a system using VMC."""
 
     # Setup system
-    ha = get_system(config.system_name, config.system)
+    ha = get_system(config)
     hi = ha.hilbert
     g = ha.graph if hasattr(ha, 'graph') else None
 
     # Ansatz model
-    ma = get_model(config.model_name, config.model, hi, g)
+    ma = get_model(config, hi, g)
 
     # Sampler
-    if hasattr(config.model, 'normalize'):
-        if not config.model.normalize and config.sampler_name == 'ARDirectSampler':
-            raise ValueError("The ARDirectSampler can only be used with normalized autoregressive models")
-    sa_cls = {
-        'MetropolisLocal': nk.sampler.MetropolisLocal,
-        'MetropolisExchange': nk.sampler.MetropolisExchange,
-        'MetropolisHopping': qk.sampler.MetropolisHopping,
-        'ARDirectSampler': qk.sampler.ARDirectSampler
-    }[config.get('sampler_name', 'ARDirectSampler')]
-    kwargs = config.to_dict()['sampler']
-    if config.system_name in ['Hchain', 'H2O', 'Hubbard1d']:
-        kwargs['dtype'] = np.uint8
-    if config.sampler_name == 'MetropolisExchange':
-        kwargs['graph'] = g
-    sa = sa_cls(hi, **kwargs)
+    sa = get_sampler(config, hi, g)
 
     # Variational state
-    if config.variational_state_name != 'ExactState' and config.variational_state.seed is None:
-        if MPIVars.rank == 0:
-            seed = np.random.randint(np.iinfo(np.uint32).max)
-        else:
-            seed = None
-        seed = MPIVars.comm.bcast(seed, root=0)
-        config.variational_state.seed = seed
-    if config.variational_state_name == 'MCState':
-        vs = nk.vqs.MCState(sa, ma, **config.variational_state)
-    elif config.variational_state_name == 'ExactState':
-        vs = nk.vqs.ExactState(hi, ma)
-    elif config.variational_state_name == 'MCStateUniqeSamples':
-        vs = qk.vqs.MCStateUniqueSamples(sa, ma, **config.variational_state)
-    elif config.variational_state_name == 'MCStateStratifiedSampling':
-        sa = qk.sampler.MetropolisHopping(hi, n_sweeps=config.variational_state.n_sweeps, n_chains_per_rank=1)
-        if MPIVars.rank == 0:
-            from ar_qgps.datasets import get_dataset
-
-            dataset = get_dataset(config.system_name, config.variational_state.dataset)
-            det_set_size = config.variational_state.deterministic_set_size
-            norb = dataset[0].shape[1]
-            det_set = np.zeros((det_set_size, norb), dtype=np.uint8)
-            det_inds = np.argsort(np.abs(dataset[1]))[:-det_set_size-1:-1]
-            np.copyto(det_set, dataset[0][det_inds,:])
-            hilbert_size = dataset[0].shape[0]
-        else:
-            hilbert_size = None
-            det_set = None
-        hilbert_size = MPIVars.comm.bcast(hilbert_size, root=0)
-        det_set = MPIVars.comm.bcast(det_set, root=0)
-        vs = qk.vqs.MCStateStratifiedSampling(
-            det_set, hilbert_size, sa, ma,
-            number_random_samples=config.variational_state.n_random_samples,
-            n_samples=config.variational_state.n_samples,
-            chunk_size=config.variational_state.chunk_size,
-            n_discard_per_chain=config.variational_state.n_discard_per_chain,
-            renormalize=config.variational_state.renormalize,
-            rand_norm=config.variational_state.rand_norm)
+    vs = get_variational_state(config, ma, hi, sa)
 
     # Optimizer
-    if config.optimizer_name == 'Sgd':
-        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
-        sr = None
-    elif config.optimizer_name == 'Adam':
-        op = nk.optimizer.Adam(learning_rate=config.optimizer.learning_rate, b1=config.optimizer.b1, b2=config.optimizer.b2)
-        sr = None
-    elif config.optimizer_name == 'SRDense':
-        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
-        qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift, diag_scale=config.optimizer.diag_scale)
-        sr = qk.optimizer.SRDense(qgt)
-    elif config.optimizer_name == 'SRRMSProp':
-        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
-        pars_struct = jax.tree_map(
-            lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vs.parameters
-        )
-        if config.optimizer.solver == 'pinv':
-            solver = qk.optimizer.pinv
-        elif config.optimizer.solver == 'cg':
-            solver = jax.scipy.sparse.linalg.cg
-        sr = qk.optimizer.SRRMSProp(
-            pars_struct,
-            qk.optimizer.qgt.QGTJacobianDenseRMSProp,
-            diag_shift=config.optimizer.diag_shift,
-            decay=config.optimizer.decay,
-            eps=config.optimizer.eps,
-            mode=config.optimizer.mode,
-            solver=solver
-        )
+    op, sr = get_optimizer(config, vs)
 
     # Restore checkpoint
     parameters = vs.parameters.unfreeze()
