@@ -294,8 +294,7 @@ def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph
         a tuple containing the filter plaquettes and masks for a filter-based GPS Ansatz
     """
     L = hilbert.size
-    if graph and graph.ndim == 2:
-        # TODO: maybe replace this code with a double for loop over lattice coordinates
+    if graph and graph.ndim == 2 and graph.pbc.all():
         translations = graph.translation_group().to_array()
         plaquettes = translations[np.argsort(translations[:,0])]
         plaquettes = HashableArray(plaquettes)
