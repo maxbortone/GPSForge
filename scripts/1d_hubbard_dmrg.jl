@@ -41,7 +41,7 @@ function main()
     pbc = parsed_args["pbc"]
     nsweeps = 10
     
-    println("Running DMRG for N=$N, t=$t and U=$U")
+    println("Running DMRG for N=$N, t=$t, U=$U and pbc=$pbc")
 
     sites = siteinds("Electron", N; conserve_qns=true)
     
