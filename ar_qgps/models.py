@@ -16,6 +16,7 @@ from typing import Union, Tuple, Callable, Optional
 
 _MODELS = {
     'qGPS': qk.models.qGPS,
+    'PlaquetteqGPS': qk.models.PlaquetteqGPS,
     'ARqGPS': qk.models.ARqGPS,
     'ARqGPSFull': qk.models.ARqGPSFull,
     'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
@@ -55,14 +56,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
     else:
         symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
     out_trafo = get_out_transformation(name, config.model.apply_exp)
-    if name == 'qGPS':
-        ma = ma_cls(
-            hilbert, hilbert.size*M,
-            dtype=dtype,
-            init_fun=init_fn,
-            syms=(symmetries_fn, inv_symmetries_fn),
-            out_transformation=out_trafo)
-    elif 'AR' in name:
+    if 'AR' in name:
         if isinstance(hilbert, nk.hilbert.Spin):
             count_spins_fn = count_spins
             renormalize_log_psi_fn = renormalize_log_psi
@@ -85,6 +79,18 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                 count_spins=count_spins_fn,
                 renormalize_log_psi=renormalize_log_psi_fn,
                 out_transformation=out_trafo)
+    else:
+        args = [hilbert, hilbert.size*M]
+        if 'Plaquette' in name:
+            plaquettes, _ = get_plaquettes_and_masks(hilbert, graph)
+            args.append(plaquettes)
+        ma = ma_cls(
+            *args,
+            dtype=dtype,
+            init_fun=init_fn,
+            syms=(symmetries_fn, inv_symmetries_fn),
+            out_transformation=out_trafo,
+            apply_fast_update=True)
     return ma
 
 def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
@@ -100,9 +106,7 @@ def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip
     Returns:
         spin symmetry transformations. For the qGPS Ansatz also the inverse transformations are returned
     """
-    if name == 'qGPS':
-        return qk.models.get_sym_transformation_spin(graph, automorphisms, spin_flip)
-    elif 'AR' in name:
+    if 'AR' in name:
         syms = graph.automorphisms().to_array().T
         inv_syms = np.zeros(syms.shape, dtype=syms.dtype)
         for i in range(syms.shape[0]):
@@ -148,6 +152,8 @@ def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip
                 inv_sym_occs = jnp.expand_dims(sample_at_indices, axis=-1)
                 return inv_sym_occs, inv_sym_sites
         return symmetries, inv_symmetries
+    else:
+        return qk.models.get_sym_transformation_spin(graph, automorphisms, spin_flip)
 
 def count_spins(spins : Array) -> Array:
     """
@@ -274,6 +280,8 @@ def get_out_transformation(name: str, apply_exp: bool):
     """
     if name == 'qGPS':
         axis = (-2,-1)
+    elif name == 'PlaquetteqGPS':
+        axis = (-3, -2, -1)
     elif 'AR' in name:
         axis = -1
     if apply_exp:

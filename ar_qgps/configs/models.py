@@ -11,6 +11,8 @@ def get_qGPS_config() -> ConfigDict:
     config.apply_exp = True
     return config
 
+get_PlaquetteqGPS_config = get_qGPS_config
+
 def get_ARqGPS_config() -> ConfigDict:
     config = get_qGPS_config()
     config.normalize = True
