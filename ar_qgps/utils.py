@@ -25,8 +25,8 @@ def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperat
     bc = "PBC" if config.pbc else "OBC"
     if Ly == 1:
         path = os.path.join(base_path, 'data/result_DMRG_Heisenberg_1D.csv')
-        df = pd.read_csv(path, dtype={'L': np.int16, 'J': np.float32, 'E': np.float32})
-        row = df.query('L == @Lx and J == @J1')
+        df = pd.read_csv(path, dtype={'L': np.int16, 'J': np.float32, 'BC': str,  'E': np.float32})
+        row = df.query('L == @Lx and J == @J1 and BC == @bc')
         exact_energy = row['E'].values[0]
     else:
         path = os.path.join(base_path, 'data/result_ED_J1J2_2D.csv')
