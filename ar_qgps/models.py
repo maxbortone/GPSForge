@@ -50,9 +50,11 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         M = int(config.model.M)
     init_fn = qk.nn.initializers.normal(sigma=config.model.sigma, dtype=dtype)
     if graph:
-        automorphisms = config.model.symmetries in ['all', 'automorphisms']
-        spin_flip = config.model.symmetries in ['all', 'spin-flip']
-        symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, automorphisms, spin_flip, graph)
+        groups = config.model.symmetries.split(',')
+        translations = 'translations' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+        point_symmetries = 'point-symmetries' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+        spin_flip = 'spin-flip' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+        symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, translations, point_symmetries, spin_flip, graph)
     else:
         symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
     out_trafo = get_out_transformation(name, config.model.apply_exp)
@@ -93,27 +95,35 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             apply_fast_update=True)
     return ma
 
-def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
+def get_symmetry_transformation_spin(name : str, translations : bool, point_symmetries: bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
     """
     Return the appropriate spin symmetry transformations
     
     Args:
         name : name of the Ansatz
-        autormophisms : whether to include autormophisms or not
+        translations : whether to include translations or not
+        point_symmetries : whether to include point-group symmetries or not
         spin_flip : whether to include spin_flip symmetry or not
         graph : underlying graph of the system
 
     Returns:
         spin symmetry transformations. For the qGPS Ansatz also the inverse transformations are returned
     """
-    if 'AR' in name:
-        syms = graph.automorphisms().to_array().T
+    automorphisms = translations or point_symmetries
+    if automorphisms:
+        if translations and point_symmetries:
+            syms = graph.automorphisms().to_array().T
+        elif translations:
+            syms = graph.translation_group().to_array().T
+        elif point_symmetries:
+            syms = graph.point_group().to_array().T
         inv_syms = np.zeros(syms.shape, dtype=syms.dtype)
         for i in range(syms.shape[0]):
             for j in range(syms.shape[1]):
                 inv_syms[syms[i,j], j] = i
         syms = jnp.array(syms)
         inv_syms = jnp.array(inv_syms)
+    if 'AR' in name:
         if automorphisms and spin_flip:
             def symmetries(samples : Array) -> Array:
                 out = jnp.take(samples, syms, axis=-1)
@@ -151,9 +161,45 @@ def get_symmetry_transformation_spin(name : str, automorphisms : bool, spin_flip
                 inv_sym_sites = jnp.expand_dims(indices, axis=-1)
                 inv_sym_occs = jnp.expand_dims(sample_at_indices, axis=-1)
                 return inv_sym_occs, inv_sym_sites
-        return symmetries, inv_symmetries
     else:
-        return qk.models.get_sym_transformation_spin(graph, automorphisms, spin_flip)
+        if automorphisms and spin_flip:
+            def symmetries(samples):
+                out = jnp.take(samples, syms, axis=-1)
+                out = jnp.concatenate((out, 1-out), axis=-1)
+                return out
+            def inv_symmetries(sample_at_indices, indices):
+                inv_sym_sites = jnp.concatenate((inv_syms[indices], inv_syms[indices]), axis=-1)
+                inv_sym_occs = jnp.tile(jnp.expand_dims(sample_at_indices, axis=-1), syms.shape[1])
+                inv_sym_occs = jnp.concatenate((inv_sym_occs, 1-inv_sym_occs), axis=-1)
+                return inv_sym_occs, inv_sym_sites
+        elif automorphisms:
+            def symmetries(samples):
+                out = jnp.take(samples, syms, axis=-1)
+                return out
+            def inv_symmetries(sample_at_indices, indices):
+                inv_sym_sites = inv_syms[indices]
+                inv_sym_occs = jnp.tile(jnp.expand_dims(sample_at_indices, axis=-1), syms.shape[1])
+                return inv_sym_occs, inv_sym_sites
+        elif spin_flip:
+            def symmetries(samples):
+                out = jnp.expand_dims(samples, axis=-1)
+                out = jnp.concatenate((out, 1-out), axis=-1)
+                return out
+            def inv_symmetries(sample_at_indices, indices):
+                inv_sym_sites = jnp.expand_dims(indices, axis=-1)
+                inv_sym_sites = jnp.concatenate((inv_sym_sites, inv_sym_sites), axis=-1)
+                inv_sym_occs = jnp.expand_dims(sample_at_indices, axis=-1)
+                inv_sym_occs = jnp.concatenate((inv_sym_occs, 1-inv_sym_occs), axis=-1)
+                return inv_sym_occs, inv_sym_sites
+        else:
+            def symmetries(samples):
+                out = jnp.expand_dims(samples, axis=-1)
+                return out
+            def inv_symmetries(sample_at_indices, indices):
+                inv_sym_sites = jnp.expand_dims(indices, axis=-1)
+                inv_sym_occs = jnp.expand_dims(sample_at_indices, axis=-1)
+                return inv_sym_occs, inv_sym_sites
+    return symmetries, inv_symmetries
 
 def count_spins(spins : Array) -> Array:
     """
