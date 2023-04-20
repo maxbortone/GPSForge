@@ -33,7 +33,7 @@ def get_sampler(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optio
     except KeyError:
         raise ValueError(f"Sampler {config.sampler_name} is not a valid class or is not supported yet.")
     kwargs = config.to_dict()['sampler']
-    if config.system_name in ['Hchain', 'H2O', 'Hubbard1d']:
+    if config.system_name in ['Hchain', 'H2O'] and config.sampler_name != 'MetropolisHopping':
         kwargs['dtype'] = np.uint8
     if config.sampler_name == 'MetropolisExchange':
         kwargs['graph'] = graph
