@@ -21,5 +21,6 @@ def get_MetropolisLocal_config(parent : ConfigDict) -> ConfigDict:
 def get_MetropolisHopping_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_chains_per_rank = 1
+    config.n_sweeps = 1
     config.hop_probability = 1.0
     return config
