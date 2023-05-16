@@ -2,13 +2,20 @@ import os
 import pathlib
 import numpy as np
 import pandas as pd
+import netket as nk
 from scipy.sparse.linalg import eigsh
 from typing import Union, Tuple
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator
 from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
 from pyscf import gto, fci, scf
+from VMCutils import restore_checkpoint
 
+
+def get_n_params(path):
+    checkpoint = restore_checkpoint(path, None)
+    params = checkpoint['1']
+    return nk.jax.tree_size(params)
 
 def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
     """
