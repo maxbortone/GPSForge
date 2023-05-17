@@ -29,13 +29,6 @@ def get_variational_state(config : ConfigDict, model: nn.Module, hilbert : Optio
     Returns:
         the variational state
     """
-    if config.variational_state_name != 'ExactState' and config.variational_state.seed is None:
-        if MPIVars.rank == 0:
-            seed = np.random.randint(np.iinfo(np.uint32).max)
-        else:
-            seed = None
-        seed = MPIVars.comm.bcast(seed, root=0)
-        config.variational_state.seed = seed
     try:
         vs_cls = _VARIATIONAL_STATES[config.get('variational_state_name')]
     except KeyError:

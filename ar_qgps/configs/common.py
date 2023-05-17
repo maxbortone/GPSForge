@@ -1,3 +1,5 @@
+import numpy as np
+from VMCutils import MPIVars
 from ml_collections import ConfigDict
 
 
@@ -30,6 +32,24 @@ def get_config() -> ConfigDict:
     return config
 
 def resolve(config: ConfigDict) -> ConfigDict:
+    # Set random seed
+    if MPIVars.rank == 0:
+        seed = np.random.randint(np.iinfo(np.uint32).max)
+    else:
+        seed = None
+    seed = MPIVars.comm.bcast(seed, root=0)
+    if config.variational_state_name != 'ExactState' and config.variational_state.get('seed', None) is None:
+        config.variational_state.seed = seed
+
+    # Resolve molecular configuration
+    if 'set_molecule' in config.system and callable(config.system.set_molecule):
+        config = config.system.set_molecule(config)
+        with config.ignore_type():
+            # Replace the function with its name so we know how the molecule was set
+            # This makes the ConfigDict object serialisable.
+            if callable(config.system.set_molecule):
+                config.system.set_molecule = config.system.set_molecule.__name__
+
     # Support dimension can be int or tuple
     if isinstance(config.model.M, str):
         M = config.model.M.split(',')
@@ -37,9 +57,8 @@ def resolve(config: ConfigDict) -> ConfigDict:
             M = tuple(map(int, M))
         else:
             M = int(M[0])
-    else:
-        M = int(config.model.M)
-    with config.ignore_type():
-        config.model.M = M
+        with config.ignore_type():
+            config.model.M = M
+
     config = config.copy_and_resolve_references()
-    return config
+    return config.lock()

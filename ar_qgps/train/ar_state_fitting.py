@@ -9,9 +9,34 @@ from optax.experimental import split_real_and_imaginary
 from ar_qgps.datasets import get_dataset
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
-from VMCutils import MPIVars, write_config, Timer
-from VMCutils import save_checkpoint, restore_checkpoint
+from ar_qgps.variational_states import get_variational_state
+from VMCutils import MPIVars, Timer, CSVLogger
+from flax import serialization
+from flax.training.checkpoints import save_checkpoint, restore_checkpoint
 
+
+def serialize_ARStateFitting(driver: qk.driver.ARStateFitting):
+    state_dict = {
+        "variables": serialization.to_state_dict(driver.state.variables),
+        "optimizer": serialization.to_state_dict(driver._optimizer_state),
+        "step": driver._step_count
+    }
+    return state_dict
+
+def deserialize_ARStateFitting(driver: nk.driver.VMC, state_dict: dict):
+    import copy
+
+    new_driver = copy.copy(driver)
+    new_driver.state.variables = serialization.from_state_dict(driver.state.variables, state_dict["variables"])
+    new_driver._optimizer_state = serialization.from_state_dict(driver._optimizer_state, state_dict["optimizer"])
+    new_driver._step_count = serialization.from_state_dict(driver._step_count, state_dict["step"])
+    return new_driver
+
+serialization.register_serialization_state(
+    qk.driver.ARStateFitting,
+    serialize_ARStateFitting,
+    deserialize_ARStateFitting
+)
 
 def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
     """Fits an autoregressive Ansatz to a target wavefunction."""
@@ -21,28 +46,21 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
 
     # Setup system
     if config.dataset.basis != config.system.basis:
-        config.system.basis = config.dataset.basis
-    ha = get_system(config.system_name, config.system)
+        raise ValueError(f"The basis set of the system and the one used to generate the data don't match.")
+    ha = get_system(config)
     hi = ha.hilbert
     g = ha.graph if hasattr(ha, 'graph') else None
 
     # Ansatz model
-    ma = get_model(config.model_name, config.model, hi, g)
+    ma = get_model(config, hi, g)
 
     # Sampler
-    if config.system_name in ['Heisenberg1d', 'Heisenberg2d', 'J1J22d']:
-        sa_dtype = np.int8
-    elif config.system_name in ['Hchain', 'H2O']:
+    if config.system_name in ['Hchain', 'H2O']:
         sa_dtype = np.uint8
     sa = qk.sampler.ARDirectSampler(hi, **config.sampler, dtype=sa_dtype)
 
     # Variational state
-    if config.variational_state_name == 'MCState':
-        vs = nk.vqs.MCState(sa, ma, **config.variational_state)
-    elif config.variational_state_name == 'ExactState':
-        vs = nk.vqs.ExactState(hi, ma)
-    elif config.variational_state_name == 'MCStateUniqeSamples':
-        vs = qk.vqs.MCStateUniqeSamples(sa, ma, **config.variational_state)
+    vs = get_variational_state(config, ma, hi, sa)
 
     # Optimizer
     if 'Sgd' in config.optimizer_name:
@@ -52,24 +70,21 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
     if config.model.dtype == 'complex':
         op = split_real_and_imaginary(op)
 
-    # Restore checkpoint
-    parameters = vs.parameters.unfreeze()
-    opt_state = op.init(parameters)
-    initial_step = 1
-    opt_state, parameters, initial_step = restore_checkpoint(workdir, (opt_state, parameters, initial_step))
-    vs.parameters = parameters
-    if MPIVars.rank == 0:
-        logging.info('Will start/continue training at initial_step=%d', initial_step)
-
     # Driver
     arsf = qk.driver.ARStateFitting(dataset, ha, op, variational_state=vs, mini_batch_size=config.mini_batch_size)
 
-    # Setup logger and write config to file
-    # TODO: replace JsonLog with HDF5Log
-    logger = nk.logging.JsonLog(os.path.join(workdir, f"output_{initial_step}"), save_params=True, save_params_every=config.log_every, write_every=config.log_every)
+    # Restore checkpoint
+    checkpoints_dir = os.path.join(workdir, "checkpoints")
+    arsf = restore_checkpoint(checkpoints_dir, arsf)
+    initial_step = arsf.step_count + 1
+    step = initial_step
     if MPIVars.rank == 0:
-        write_config(workdir, config)
-        logging.info(f"Saved config at {os.path.join(workdir, 'config.yaml')}")
+        logging.info('Will start/continue training at initial_step=%d', initial_step)
+
+    # Logger
+    if MPIVars.rank == 0:
+        fieldnames = ["Loss", "Runtime"]
+        logger = CSVLogger(os.path.join(workdir, "metrics.csv"), fieldnames)
 
     # Run training loop
     if MPIVars.rank == 0:
@@ -78,30 +93,34 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
         t0 = time.time()
     total_steps = config.total_steps
     for step in range(initial_step, total_steps + 1):
-
+        # Training step
         arsf.advance()
-        logger(step, {"Loss": arsf._loss_stats}, arsf.state)
 
+        # Report compilation time
         if MPIVars.rank == 0 and step == initial_step:
-            logging.info('First step took %.1f seconds.', time.time() - t0)
-            t0 = time.time()
-
+            logging.info(f"First step took {time.time() - t0:.1f} seconds.")
+        
+        # Update timer
         if MPIVars.rank == 0:
             timer.update(step)
+        
+        # Log data
+        if MPIVars.rank == 0:
+            logger(step, {"Loss": arsf._loss_stats, "Runtime": timer.runtime})
 
         # Report training metrics
         if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
             grad, _ = nk.jax.tree_ravel(arsf._loss_grad)
             grad_norm = np.linalg.norm(grad)
             done = step / total_steps
-            logging.info(f'Step: {step}/{total_steps} {100*done:.1f}%, '  # pylint: disable=logging-format-interpolation
-                         f'L: {arsf.loss}, '
-                         f'||∇E||: {grad_norm:.4f}, '
-                         f'{timer}')
+            logging.info(f"Step: {step}/{total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
+                         f"L: {arsf.loss}, "
+                         f"||∇E||: {grad_norm:.4f}, "
+                         f"{timer}")
 
         # Store checkpoint
         if MPIVars.rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == total_steps):
-            checkpoint_path = save_checkpoint(workdir, (arsf._optimizer_state, arsf.state.parameters, step), step, overwrite=True)
+            checkpoint_path = save_checkpoint(workdir, arsf, step, keep_every_n_steps=config.checkpoint_every)
             logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")
 
     return 
