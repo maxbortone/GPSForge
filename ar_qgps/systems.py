@@ -22,7 +22,7 @@ def get_system(config : ConfigDict) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name == 'Hchain' or name == 'H2O':
+    elif name in ['Hchain', 'Hsheet', 'H2O']:
         return get_molecular_system(config.system)
     elif 'Hubbard' in name:
         return get_Hubbard_system(config.system)
@@ -48,7 +48,7 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
         sign_rule = (config.sign_rule, False)
     else:
         sign_rule = config.sign_rule
-    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
+    ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, total_sz=config.total_sz, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
 def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
@@ -64,13 +64,10 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
     # Setup Hilbert space
     if MPIVars.rank == 0:
         mol = gto.Mole()
-        if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
-            atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
-        else:
-            atom = config.atom
+        molecule = config.get('molecule')
         mol.build(
-            atom = atom,
-            basis = config.basis_set,
+            atom=molecule,
+            basis=config.basis_set,
             symmetry=config.symmetry,
             unit=config.unit
         )
