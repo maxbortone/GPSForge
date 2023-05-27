@@ -5,6 +5,8 @@ def get_ARDirectSampler_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     return config
 
+get_NKARDirectSampler_config = get_ARDirectSampler_config
+
 def get_MetropolisExchange_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_chains_per_rank = 1

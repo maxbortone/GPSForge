@@ -19,7 +19,8 @@ _MODELS = {
     'PlaquetteqGPS': qk.models.PlaquetteqGPS,
     'ARqGPS': qk.models.ARqGPS,
     'ARqGPSFull': qk.models.ARqGPSFull,
-    'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS
+    'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS,
+    'PixelCNN': qk.models.PixelCNN
 }
 
 def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None) -> nn.Module:
@@ -43,56 +44,86 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         dtype = jnp.float64
     elif config.model.dtype == 'complex':
         dtype = jnp.complex128
-    if isinstance(config.model.M, tuple):
-        assert len(config.model.M) == hilbert.size
-        M = HashableArray(np.array(config.M))
-    else:
-        M = int(config.model.M)
-    init_fn = qk.nn.initializers.normal(sigma=config.model.sigma, dtype=dtype)
-    if graph:
-        groups = config.model.symmetries.split(',')
-        translations = 'translations' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
-        point_symmetries = 'point-symmetries' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
-        spin_flip = 'spin-flip' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
-        symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, translations, point_symmetries, spin_flip, graph)
-    else:
-        symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
-    out_trafo = get_out_transformation(name, config.model.apply_exp)
-    if 'AR' in name:
-        if isinstance(hilbert, nk.hilbert.Spin):
-            count_spins_fn = count_spins
-            renormalize_log_psi_fn = renormalize_log_psi
-        elif isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
-            count_spins_fn = count_spins_fermionic
-            renormalize_log_psi_fn = renormalize_log_psi_fermionic
-        args = [hilbert, M]
-        if 'Plaquette' in name:
-            args.extend(get_plaquettes_and_masks(hilbert, graph))
-        if 'Full' in name:
-            apply_symmetries = (symmetries_fn, inv_symmetries_fn)
+    if 'GPS'  in name:
+        if isinstance(config.model.M, tuple):
+            assert len(config.model.M) == hilbert.size
+            M = HashableArray(np.array(config.M))
         else:
-            apply_symmetries = symmetries_fn
-        ma = ma_cls(
+            M = int(config.model.M)
+        init_fn = qk.nn.initializers.normal(sigma=config.model.sigma, dtype=dtype)
+        if graph:
+            groups = config.model.symmetries.split(',')
+            translations = 'translations' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+            point_symmetries = 'point-symmetries' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+            spin_flip = 'spin-flip' in groups or groups[0] == 'all' or groups[0] == 'automorphisms'
+            symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, translations, point_symmetries, spin_flip, graph)
+        else:
+            symmetries_fn, inv_symmetries_fn = qk.models.no_syms()
+        out_trafo = get_out_transformation(name, config.model.apply_exp)
+        if 'AR' in name:
+            if isinstance(hilbert, nk.hilbert.Spin):
+                count_spins_fn = count_spins
+                renormalize_log_psi_fn = renormalize_log_psi
+            elif isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
+                count_spins_fn = count_spins_fermionic
+                renormalize_log_psi_fn = renormalize_log_psi_fermionic
+            args = [hilbert, M]
+            if 'Plaquette' in name:
+                args.extend(get_plaquettes_and_masks(hilbert, graph))
+            if 'Full' in name:
+                apply_symmetries = (symmetries_fn, inv_symmetries_fn)
+            else:
+                apply_symmetries = symmetries_fn
+            ma = ma_cls(
+                    *args,
+                    dtype=dtype,
+                    init_fun=init_fn,
+                    normalize=config.model.normalize,
+                    apply_symmetries=apply_symmetries,
+                    count_spins=count_spins_fn,
+                    renormalize_log_psi=renormalize_log_psi_fn,
+                    out_transformation=out_trafo)
+        else:
+            args = [hilbert, hilbert.size*M]
+            if 'Plaquette' in name:
+                plaquettes, _ = get_plaquettes_and_masks(hilbert, graph)
+                args.append(plaquettes)
+            ma = ma_cls(
                 *args,
                 dtype=dtype,
                 init_fun=init_fn,
-                normalize=config.model.normalize,
-                apply_symmetries=apply_symmetries,
-                count_spins=count_spins_fn,
-                renormalize_log_psi=renormalize_log_psi_fn,
-                out_transformation=out_trafo)
-    else:
-        args = [hilbert, hilbert.size*M]
-        if 'Plaquette' in name:
-            plaquettes, _ = get_plaquettes_and_masks(hilbert, graph)
-            args.append(plaquettes)
+                syms=(symmetries_fn, inv_symmetries_fn),
+                out_transformation=out_trafo,
+                apply_fast_update=True)
+    elif 'PixelCNN' in name:
+        if config.system.get('Ly', None) is None:
+            raise ValueError("PixelCNN Ansatz is only implemented for 2D systems.")
+        if isinstance(hilbert, nk.hilbert.Spin):
+            def total_sz(inputs: Array) -> Array:
+                n_spins_up = jnp.cumsum(inputs == -1., axis=-1)
+                n_spins_dn = jnp.cumsum(inputs == 1., axis=-1)
+                n_spins = jnp.stack([n_spins_up, n_spins_dn], axis=-1)
+                n_spins = jnp.concatenate([jnp.zeros((inputs.shape[0], 1, 2)), n_spins[:, :-1, :]], axis=1)
+                return n_spins
+
+            def get_zero_total_sz_constraint(hilbert : HomogeneousHilbert):
+                def constraint_fn(gauge: Array) -> Array: 
+                    return gauge >= hilbert.size // 2
+                return constraint_fn
+            gauge_fn = total_sz
+            constraint_fn = get_zero_total_sz_constraint(hilbert)
+        elif isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
+            raise ValueError("PixelCNN Ansatz is not implemented for fermionic systems.")
         ma = ma_cls(
-            *args,
-            dtype=dtype,
-            init_fun=init_fn,
-            syms=(symmetries_fn, inv_symmetries_fn),
-            out_transformation=out_trafo,
-            apply_fast_update=True)
+            hilbert,
+            param_dtype=dtype,
+            kernel_size=config.model.kernel_size,
+            n_channels=config.model.n_channels,
+            depth=config.model.depth,
+            normalize=config.model.normalize,
+            gauge_fn=gauge_fn,
+            constraint_fn=constraint_fn
+        )
     return ma
 
 def get_symmetry_transformation_spin(name : str, translations : bool, point_symmetries: bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:

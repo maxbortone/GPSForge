@@ -5,7 +5,7 @@ from ml_collections.config_dict import placeholder
 def get_MCState_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_samples = 100
-    if parent.get_ref('sampler_name') != 'ARDirectSampler':
+    if parent.get_ref('sampler_name') != 'ARDirectSampler' and parent.get_ref('sampler_name') != 'NKARDirectSampler':
         config.n_discard_per_chain = config.get_ref('n_samples') // 10
     config.chunk_size = placeholder(int)
     config.seed = placeholder(int)

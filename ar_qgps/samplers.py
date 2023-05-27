@@ -10,7 +10,8 @@ from typing import Optional
 _SAMPLERS = {
     'MetropolisExchange': nk.sampler.MetropolisExchange,
     'MetropolisHopping': qk.sampler.MetropolisHopping,
-    'ARDirectSampler': qk.sampler.ARDirectSampler
+    'ARDirectSampler': qk.sampler.ARDirectSampler,
+    'NKARDirectSampler': nk.sampler.ARDirectSampler
 }
 
 def get_sampler(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None) -> nk.sampler.Sampler:

@@ -51,7 +51,7 @@ def resolve(config: ConfigDict) -> ConfigDict:
                 config.system.set_molecule = config.system.set_molecule.__name__
 
     # Support dimension can be int or tuple
-    if isinstance(config.model.M, str):
+    if config.model.get('M', None) and isinstance(config.model.M, str):
         M = config.model.M.split(',')
         if len(M) > 1:
             M = tuple(map(int, M))

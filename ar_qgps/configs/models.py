@@ -20,3 +20,12 @@ def get_ARqGPS_config() -> ConfigDict:
 
 get_ARqGPSFull_config = get_ARqGPS_config
 get_ARPlaquetteqGPS_config = get_ARqGPS_config
+
+def get_PixelCNN_config() -> ConfigDict:
+    config = ConfigDict()
+    config.dtype = 'real'
+    config.kernel_size = 3
+    config.n_channels = 32
+    config.depth = 10
+    config.normalize = True
+    return config
