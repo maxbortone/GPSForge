@@ -16,7 +16,7 @@ from typing import Union, Tuple, Callable, Optional
 
 _MODELS = {
     'qGPS': qk.models.qGPS,
-    'PlaquetteqGPS': qk.models.PlaquetteqGPS,
+    'PlaquetteqGPS': qk.models.qGPS,
     'ARqGPS': qk.models.ARqGPS,
     'ARqGPSFull': qk.models.ARqGPSFull,
     'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS,
@@ -85,9 +85,9 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                     out_transformation=out_trafo)
         else:
             args = [hilbert, hilbert.size*M]
+            # Implement PlaquetteqGPS as a qGPS with kernel symmetrization over lattice translations
             if 'Plaquette' in name:
-                plaquettes, _ = get_plaquettes_and_masks(hilbert, graph)
-                args.append(plaquettes)
+                symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, True, False, False, graph)
             ma = ma_cls(
                 *args,
                 dtype=dtype,
@@ -355,10 +355,8 @@ def get_out_transformation(name: str, apply_exp: bool):
     Returns:
         a callable function that is applied in the output layer of a GPS model
     """
-    if name == 'qGPS':
+    if name == 'qGPS' or name == 'PlaquetteqGPS':
         axis = (-2,-1)
-    elif name == 'PlaquetteqGPS':
-        axis = (-3, -2, -1)
     elif 'AR' in name:
         axis = -1
     if apply_exp:
