@@ -9,7 +9,7 @@ from ml_collections import ConfigDict
 from netket.operator import AbstractOperator
 from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
 from pyscf import gto, fci, scf
-from VMCutils import restore_checkpoint
+from flax.training.checkpoints import restore_checkpoint
 
 
 def get_n_params(path):
