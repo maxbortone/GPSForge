@@ -14,6 +14,8 @@ def get_MetropolisExchange_config(parent : ConfigDict) -> ConfigDict:
     config.d_max = parent.system.get_ref('Lx')//2
     return config
 
+get_MetropolisFastExchange_config = get_MetropolisExchange_config
+
 def get_MetropolisLocal_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_chains_per_rank = 1

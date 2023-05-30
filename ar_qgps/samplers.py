@@ -9,6 +9,7 @@ from typing import Optional
 
 _SAMPLERS = {
     'MetropolisExchange': nk.sampler.MetropolisExchange,
+    'MetropolisFastExchange': qk.sampler.MetropolisFastExchange,
     'MetropolisHopping': qk.sampler.MetropolisHopping,
     'ARDirectSampler': qk.sampler.ARDirectSampler,
     'NKARDirectSampler': nk.sampler.ARDirectSampler
@@ -36,7 +37,7 @@ def get_sampler(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optio
     kwargs = config.to_dict()['sampler']
     if config.system_name in ['Hchain', 'H2O'] and config.sampler_name != 'MetropolisHopping':
         kwargs['dtype'] = np.uint8
-    if config.sampler_name == 'MetropolisExchange':
+    if config.sampler_name == 'MetropolisExchange' or config.sampler_name == 'MetropolisFastExchange':
         kwargs['graph'] = graph
     sa = sa_cls(hilbert, **kwargs)
     return sa
