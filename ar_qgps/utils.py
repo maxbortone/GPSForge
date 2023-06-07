@@ -1,4 +1,5 @@
 import os
+import glob
 import pathlib
 import numpy as np
 import pandas as pd
@@ -12,10 +13,18 @@ from pyscf import gto, fci, scf
 from flax.training.checkpoints import restore_checkpoint
 
 
-def get_n_params(path):
-    checkpoint = restore_checkpoint(path, None)
-    params = checkpoint['1']
-    return nk.jax.tree_size(params)
+def get_n_params(workdir: str) -> int:
+    if os.path.isdir(os.path.join(workdir, 'checkpoints')):
+        path = os.path.join(workdir, 'checkpoints')
+        checkpoint = restore_checkpoint(path, None)
+        params = checkpoint['variables']['params']
+        n_params = nk.jax.tree_size(params)
+    else:
+        path = workdir
+        checkpoint = restore_checkpoint(path, None)
+        params = checkpoint['1']
+        n_params = nk.jax.tree_size(params)
+    return n_params
 
 def get_Heisenberg_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=None) -> Union[float, None]:
     """
