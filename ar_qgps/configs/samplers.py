@@ -28,3 +28,5 @@ def get_MetropolisHopping_config(parent : ConfigDict) -> ConfigDict:
     config.n_sweeps = 1
     config.hop_probability = 1.0
     return config
+
+get_MetropolisFastHopping_config = get_MetropolisHopping_config

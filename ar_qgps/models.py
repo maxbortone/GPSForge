@@ -85,8 +85,11 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                     out_transformation=out_trafo)
         else:
             # Implement PlaquetteqGPS as a qGPS with kernel symmetrization over lattice translations
+            # FIXME: this doesn't support projective symmetrization
             if 'Plaquette' in name:
                 args = [hilbert, M]
+                if config.system_name == 'Hubbard1d':
+                    graph = nk.graph.Chain(config.system.Lx, pbc=config.system.pbc)
                 symmetries_fn, inv_symmetries_fn = get_symmetry_transformation_spin(name, True, False, False, graph)
             else:
                 args = [hilbert, hilbert.size*M]
