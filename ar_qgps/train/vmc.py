@@ -6,6 +6,7 @@ import netket as nk
 import GPSKet as qk
 import jax.numpy as jnp
 from absl import logging
+from typing import Union
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
 from ar_qgps.samplers import get_sampler
@@ -42,7 +43,7 @@ def deserialize_VMC(driver: nk.driver.VMC, state_dict: dict):
     return new_driver
 
 serialization.register_serialization_state(
-    nk.driver.VMC,
+    Union[nk.driver.VMC, qk.driver.minSRVMC],
     serialize_VMC,
     deserialize_VMC
 )
