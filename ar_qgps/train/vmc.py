@@ -43,7 +43,13 @@ def deserialize_VMC(driver: nk.driver.VMC, state_dict: dict):
     return new_driver
 
 serialization.register_serialization_state(
-    Union[nk.driver.VMC, qk.driver.minSRVMC],
+    nk.driver.VMC,
+    serialize_VMC,
+    deserialize_VMC
+)
+
+serialization.register_serialization_state(
+    qk.driver.minSRVMC,
     serialize_VMC,
     deserialize_VMC
 )
