@@ -1,6 +1,7 @@
 import numpy as np
 import netket as nk
 import GPSKet as qk
+from GPSKet.hilbert import FermionicDiscreteHilbert
 from netket.hilbert import HomogeneousHilbert
 from netket.graph import AbstractGraph
 from ml_collections import ConfigDict
@@ -36,7 +37,7 @@ def get_sampler(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optio
     except KeyError:
         raise ValueError(f"Sampler {config.sampler_name} is not a valid class or is not supported yet.")
     kwargs = config.to_dict()['sampler']
-    if config.system_name in ['Hchain', 'H2O'] and (config.sampler_name != 'MetropolisHopping' or config.sampler_name != 'MetropolisFastHopping'):
+    if isinstance(hilbert, FermionicDiscreteHilbert) and config.sampler_name != 'MetropolisHopping' and config.sampler_name != 'MetropolisFastHopping':
         kwargs['dtype'] = np.uint8
     if config.sampler_name == 'MetropolisExchange' or config.sampler_name == 'MetropolisFastExchange':
         kwargs['graph'] = graph

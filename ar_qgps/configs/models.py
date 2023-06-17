@@ -29,3 +29,12 @@ def get_PixelCNN_config() -> ConfigDict:
     config.depth = 10
     config.normalize = True
     return config
+
+def get_BackflowCPD_config() -> ConfigDict:
+    config = ConfigDict()
+    config.M = '1'
+    config.dtype = 'real'
+    config.sigma = 0.1
+    config.restricted = False
+    config.fixed_magnetization = True
+    return config

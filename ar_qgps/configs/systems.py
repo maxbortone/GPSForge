@@ -80,7 +80,7 @@ def get_Hsheet_config() -> ConfigDict:
 
 def get_H2O_config() -> ConfigDict:
     config = ConfigDict()
-    config.atom = [('H', (0., 0.795, -0.454)), ('H', (0., -0.795, -0.454)), ('O', (0., 0., 0.113))]
+    config.molecule = [('H', (0., 0.795, -0.454)), ('H', (0., -0.795, -0.454)), ('O', (0., 0., 0.113))]
     config.basis_set = '6-31g'
     config.basis = 'canonical'
     config.symmetry=False

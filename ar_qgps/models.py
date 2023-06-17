@@ -11,8 +11,13 @@ from netket.graph import AbstractGraph
 from netket.utils import HashableArray
 from netket.utils.types import Array
 from ml_collections import ConfigDict
+from pyscf import gto, scf, ao2mo
+from GPSKet.operator.hamiltonian import AbInitioHamiltonian, AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse
+from VMCutils import MPIVars
 from typing import Union, Tuple, Callable, Optional
 
+
+Hamiltonian = Union[AbInitioHamiltonian, AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]
 
 _MODELS = {
     'qGPS': qk.models.qGPS,
@@ -20,10 +25,11 @@ _MODELS = {
     'ARqGPS': qk.models.ARqGPS,
     'ARqGPSFull': qk.models.ARqGPSFull,
     'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS,
-    'PixelCNN': qk.models.PixelCNN
+    'PixelCNN': qk.models.PixelCNN,
+    'BackflowCPD': qk.models.Backflow,
 }
 
-def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None) -> nn.Module:
+def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None, hamiltonian : Hamiltonian = None) -> nn.Module:
     """
     Return the model for a wavefunction Ansatz
 
@@ -31,6 +37,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         config : experiment configuration file
         hilbert : Hilbert space on which the model should act
         graph : graph associated with the Hilbert space (optional)
+        hamiltonian : Hamiltonian of the system (optional)
 
     Returns:
         the model for the wavefunction Ansatz
@@ -128,6 +135,45 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             normalize=config.model.normalize,
             gauge_fn=gauge_fn,
             constraint_fn=constraint_fn
+        )
+    elif 'Backflow' in name:
+        if not isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
+            raise ValueError("Backflow Ansatz is only implemented for fermionic systems.")
+        norb = hilbert.size
+        nelec = np.sum(hilbert._n_elec)
+        init_fn = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+        out_trafo, total_supp_dim = get_backflow_out_transformation(
+            config.model.M,
+            norb,
+            nelec,
+            config.model.restricted,
+            config.model.fixed_magnetization
+        )
+        mol = gto.Mole()
+        mol.build(
+            atom=config.system.molecule,
+            basis=config.system.basis_set,
+            symmetry=config.system.symmetry,
+            unit=config.system.unit
+        )
+        h1 = hamiltonian.h_mat
+        h2 = hamiltonian.eri_mat
+        orbitals = get_hf_orbitals(mol, norb, hilbert._n_elec, h1, h2, config.model.restricted, config.model.fixed_magnetization)
+        correction_fn = qk.models.qGPS(
+            hilbert,
+            total_supp_dim,
+            dtype=dtype,
+            init_fun=init_fn,
+            out_transformation=out_trafo,
+            apply_fast_update=True
+        )
+        ma = ma_cls(
+            hilbert,
+            HashableArray(orbitals),
+            correction_fn,
+            spin_symmetry_by_structure=config.model.restricted,
+            fixed_magnetization=config.model.fixed_magnetization,
+            apply_fast_update=True
         )
     return ma
 
@@ -390,3 +436,84 @@ def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph
         plaquettes = HashableArray(circulant(np.arange(L)))
     masks = HashableArray(np.where(plaquettes >= np.repeat([np.arange(L)], L, axis=0).T, 0, 1))
     return (plaquettes, masks)
+
+def get_hf_orbitals(mol: gto.M, norb: int, n_elec: Tuple, h1: np.array, h2: np.array, restricted: bool=True, fixed_magnetization: bool=True):
+    if MPIVars.comm.rank == 0:
+        # Calculate the mean-field Hartree-Fock energy and wave function
+        if restricted:
+            mf = scf.RHF(mol)
+        else:
+            mf = scf.UHF(mol)
+        mf.get_hcore = lambda *args: h1
+        mf.get_ovlp = lambda *args: np.eye(norb)
+        mf._eri = ao2mo.restore(8, h2, norb)
+        _, vecs = np.linalg.eigh(h1)
+
+        # Optimize
+        if not restricted:
+            # Break spin-symmetry
+            dm_alpha, dm_beta = mf.get_init_guess()
+            dm_beta[:2, :2] = 0
+            init_dens = (dm_alpha, dm_beta)
+            mf = scf.newton(mf)
+            mf.kernel(dm0=init_dens)
+            mo1 = mf.stability(external=True)[0]
+            mf.kernel(dm0=mf.make_rdm1(mo_coeff=mo1))
+            mo1 = mf.stability(external=True)[0]
+            assert (mf.converged)
+        else:
+            # Check that orbitals are restricted
+            assert (n_elec[0] == n_elec[1])
+            init_dens = np.dot(vecs[:, :n_elec[0]], vecs[:, :n_elec[0]].T)
+            mf.kernel(dm0=init_dens)
+            if not mf.converged:
+                mf = scf.newton(mf)
+                mf.kernel(mo_coeff=mf.mo_coeff, mo_occ=mf.mo_occ)
+            assert (mf.converged)
+        
+        # Return orbitals
+        if fixed_magnetization:
+            if restricted:
+                orbitals = mf.mo_coeff[:, :mol.nelectron//2]
+            else:
+                orbitals = np.concatenate([mf.mo_coeff[0, :, :n_elec[0]], mf.mo_coeff[1, :, :n_elec[1]]], axis=1)
+        else:
+            orbitals = np.zeros((2*norb, np.sum(n_elec)))
+            orbitals[:norb, :n_elec[0]] = mf.mo_coeff[0, :, :n_elec[0]]
+            orbitals[norb:, n_elec[0]:] = mf.mo_coeff[1, :, :n_elec[1]]
+    else:
+        orbitals = None
+    orbitals = MPIVars.comm.bcast(orbitals, root=0)
+    return orbitals
+
+def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: bool=True, fixed_magnetization: bool=True):
+    """
+    Return the transformation of the ouput layer for a GPS model to work within a backflow Ansatz
+
+    Args:
+        M : support dimension of each GPS backflow orbital model
+        norb : number of orbitals
+        nelec : number of electrons
+        restricted : whether the α and β orbitals are the same or not
+        fixed_magnetization : whether magnetization should be conserved or not
+
+    Returns:
+        a callable function that is applied in the output layer of a GPS model and
+        the total support dimension of the GPS model
+    """
+    if fixed_magnetization:
+        if restricted:
+            shape = (M, norb, nelec//2)
+        else:
+            shape = (M, norb, nelec)
+    else:
+        shape = (M, 2*norb, nelec)
+    def out_trafo(x):
+        batch_size = x.shape[0]
+        n_syms = x.shape[-1]
+        # Reshape output into (B, M, L, N, T)
+        x = jnp.reshape(x, (batch_size,)+shape+(n_syms,))
+        # Sum over support dim M
+        out = jnp.sum(x, axis=1)
+        return out
+    return out_trafo, np.prod(shape)

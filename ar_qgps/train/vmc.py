@@ -56,7 +56,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     g = ha.graph if hasattr(ha, 'graph') else None
 
     # Ansatz model
-    ma = get_model(config, hi, g)
+    ma = get_model(config, hi, g, ha)
 
     # Sampler
     sa = get_sampler(config, hi, g)
