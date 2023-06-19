@@ -84,10 +84,10 @@ def get_molecular_exact_energy(config: ConfigDict, hamiltonian: AbInitioHamilton
     n_electrons = np.sum(hamiltonian.hilbert._n_elec)
     n_orbitals = hamiltonian.hilbert.size
     mol = gto.Mole()
-    if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
-        atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
-    else:
+    if config.get('atom', None):
         atom = config.atom
+    else:
+        atom = config.molecule
     mol.build(
         atom = atom,
         basis = config.basis_set,
@@ -104,10 +104,10 @@ def get_molecular_hf_energy(config: ConfigDict) -> Tuple[float, float]:
     Returns the Hartree-Fock energy for a molecular system defined by `config` and `hamiltonian`
     """
     mol = gto.Mole()
-    if isinstance(config.atom, str) and hasattr(config, 'distance') and hasattr(config, 'n_atoms'):
-        atom = [(config.atom, (x*config.distance, 0., 0.)) for x in range(config.n_atoms)]
-    else:
+    if config.get('atom', None):
         atom = config.atom
+    else:
+        atom = config.molecule
     mol.build(
         atom = atom,
         basis = config.basis_set,
