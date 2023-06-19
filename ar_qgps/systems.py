@@ -62,11 +62,14 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
         Hamiltonian for the molecular system
     """
     # Setup Hilbert space
+    if config.get('atom', None):
+        atom = config.atom
+    else:
+        atom = config.molecule
     if MPIVars.rank == 0:
         mol = gto.Mole()
-        molecule = config.get('molecule')
         mol.build(
-            atom=molecule,
+            atom=atom,
             basis=config.basis_set,
             symmetry=config.symmetry,
             unit=config.unit
@@ -100,7 +103,7 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
 
         # Transform to a local orbital basis if wanted
         if 'local' in config.basis:
-            loc_coeff = lo.orth_ao(mol, 'meta_lowdin')
+            loc_coeff = lo.orth_ao(mol, 'lowdin')
             if 'boys' in config.basis:
                 localizer = lo.Boys(mol, mo_coeff=loc_coeff)
                 localizer.init_guess = None
