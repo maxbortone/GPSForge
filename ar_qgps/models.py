@@ -472,15 +472,18 @@ def get_hf_orbitals(mol: gto.M, norb: int, n_elec: Tuple, h1: np.array, h2: np.a
             assert (mf.converged)
         
         # Return orbitals
+        nelec = np.sum(n_elec)
         if fixed_magnetization:
             if restricted:
-                orbitals = mf.mo_coeff[:, :mol.nelectron//2]
+                orbitals = mf.mo_coeff[:, :n_elec[0]]
             else:
-                orbitals = np.concatenate([mf.mo_coeff[0, :, :n_elec[0]], mf.mo_coeff[1, :, :n_elec[1]]], axis=1)
+                mo_coeff = np.reshape(mf.mo_coeff, (2, norb, norb))
+                orbitals = np.concatenate([mo_coeff[0, :, :n_elec[0]], mo_coeff[1, :, :n_elec[1]]], axis=1)
         else:
-            orbitals = np.zeros((2*norb, np.sum(n_elec)))
-            orbitals[:norb, :n_elec[0]] = mf.mo_coeff[0, :, :n_elec[0]]
-            orbitals[norb:, n_elec[0]:] = mf.mo_coeff[1, :, :n_elec[1]]
+            orbitals = np.zeros((2*norb, nelec))
+            mo_coeff = np.reshape(mf.mo_coeff, (2, norb, norb))
+            orbitals[:norb, :n_elec[0]] = mo_coeff[0, :, :n_elec[0]]
+            orbitals[norb:, n_elec[0]:] = mo_coeff[1, :, :n_elec[1]]
     else:
         orbitals = None
     orbitals = MPIVars.comm.bcast(orbitals, root=0)
