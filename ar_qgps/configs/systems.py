@@ -94,3 +94,13 @@ def get_Hubbard1d_config() -> ConfigDict:
     config.U = 1.0
     config.pbc = True
     return config
+
+def get_Hubbard2d_config() -> ConfigDict:
+    config = ConfigDict()
+    config.Lx = 4
+    config.Ly = 4
+    config.t = 1.0
+    config.U = 1.0
+    config.pbc = 'PBC-APBC'
+    config.n_elec = (8, 8)
+    return config

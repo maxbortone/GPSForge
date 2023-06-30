@@ -146,19 +146,39 @@ def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     Returns:
         Hamiltonian for the Hubbard system at half-filling
     """
-    # Setup Hilbert space
+    # Setup graph and Hilbert space
     Lx = config.Lx
+    Ly = config.get('Ly', 1)
     t = config.t
     U = config.U
-
-    # TODO: add support for 2d system
-    g = nk.graph.Chain(Lx, pbc=config.pbc)
-    hi = qk.hilbert.FermionicDiscreteHilbert(g.n_nodes, n_elec=(g.n_nodes//2,g.n_nodes//2))
+    n_elec = config.get('n_elec', None)
+    if Ly > 1:
+        # config.pbc:
+        # - 'PBC-PBC' = periodic boundary conditions in both dimensions
+        # - 'PBC-APBC' = periodic boundary conditions in one dimension, and anti-periodic in the other
+        #   - implemented by changing the sign on the hopping terms in one direction
+        # - 'PBC-OBC' = periodic boundary conditions in one dimension, and open in the other
+        if config.pbc in ['PBC', 'PBC-PBC', 'PBC-APBC']:
+            pbc = [True, True]
+        elif 'OBC' in config.pbc:
+            pbc = [True, False] 
+        g = nk.graph.Grid([Lx, Ly], pbc=pbc)
+    else:
+        # config.pbc = True/False
+        g = nk.graph.Chain(Lx, pbc=config.pbc)
+    if n_elec is None:
+        n_elec = (g.n_nodes//2, g.n_nodes//2)
+    hi = qk.hilbert.FermionicDiscreteHilbert(g.n_nodes, n_elec=n_elec)
 
     # Setup Hamiltonian
-    edges = np.array([[i, (i+1)%Lx] for i in range(Lx)])
-    t = t*np.ones(Lx)
-    if config.pbc and Lx % 4 == 0:
-        t[-1] *= -1
+    edges = np.array(g.edges())
+    t = np.ones(edges.shape[0])*config.t
+    if Ly > 1 and 'APBC' in config.pbc:
+        for i, edge in enumerate(edges):
+            if np.abs(edge[0]-edge[1]) // config.Ly == (config.Lx-1):
+                t[i] *= -1.0
+    else:
+        if config.pbc and Lx % 4 == 0:
+            t[-1] *= -1.0
     ha = FermiHubbardOnTheFly(hi, edges, U=U, t=t)
     return ha

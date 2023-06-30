@@ -12,12 +12,13 @@ from netket.utils import HashableArray
 from netket.utils.types import Array
 from ml_collections import ConfigDict
 from pyscf import gto, scf, ao2mo
-from GPSKet.operator.hamiltonian import AbInitioHamiltonian, AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse
+from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly
 from VMCutils import MPIVars
+from plum import dispatch
 from typing import Union, Tuple, Callable, Optional
 
 
-Hamiltonian = Union[AbInitioHamiltonian, AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]
+Hamiltonian = Union[AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly]
 
 _MODELS = {
     'qGPS': qk.models.qGPS,
@@ -149,16 +150,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             config.model.restricted,
             config.model.fixed_magnetization
         )
-        mol = gto.Mole()
-        mol.build(
-            atom=config.system.molecule,
-            basis=config.system.basis_set,
-            symmetry=config.system.symmetry,
-            unit=config.system.unit
-        )
-        h1 = hamiltonian.h_mat
-        h2 = hamiltonian.eri_mat
-        orbitals = get_hf_orbitals(mol, norb, hilbert._n_elec, h1, h2, config.model.restricted, config.model.fixed_magnetization)
+        orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
@@ -437,8 +429,11 @@ def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph
     masks = HashableArray(np.where(plaquettes >= np.repeat([np.arange(L)], L, axis=0).T, 0, 1))
     return (plaquettes, masks)
 
-def get_hf_orbitals(mol: gto.M, norb: int, n_elec: Tuple, h1: np.array, h2: np.array, restricted: bool=True, fixed_magnetization: bool=True):
+def get_hf_orbitals(config : ConfigDict, hamiltonian : Hamiltonian, restricted: bool=True, fixed_magnetization: bool=True):
     if MPIVars.comm.rank == 0:
+        # Setup molecular system
+        mol, h1, h2, norb, n_elec, nelec = setup_mol(config, hamiltonian)
+
         # Calculate the mean-field Hartree-Fock energy and wave function
         if restricted:
             mf = scf.RHF(mol)
@@ -488,6 +483,38 @@ def get_hf_orbitals(mol: gto.M, norb: int, n_elec: Tuple, h1: np.array, h2: np.a
         orbitals = None
     orbitals = MPIVars.comm.bcast(orbitals, root=0)
     return orbitals
+
+@dispatch
+def setup_mol(config: ConfigDict, hamiltonian: AbInitioHamiltonianOnTheFly):
+    norb = hamiltonian.hilbert.size
+    n_elec = hamiltonian.hilbert._n_elec
+    nelec = np.sum(n_elec)
+    mol = gto.Mole()
+    mol.build(
+        atom=config.molecule,
+        basis=config.basis_set,
+        symmetry=config.symmetry,
+        unit=config.unit
+    )
+    h1 = hamiltonian.h_mat
+    h2 = hamiltonian.eri_mat
+    return mol, h1, h2, norb, n_elec, nelec
+
+@dispatch
+def setup_mol(config : ConfigDict, hamiltonian : FermiHubbardOnTheFly):
+    norb = hamiltonian.hilbert.size
+    n_elec = hamiltonian.hilbert._n_elec
+    nelec = np.sum(n_elec)
+    mol = gto.M()
+    mol.nelectron = nelec
+    mol.spin = n_elec[0] - n_elec[1]
+    h1 = np.zeros((norb, norb))
+    for i, edge in enumerate(hamiltonian.edges):
+        h1[edge[0], edge[1]] = -hamiltonian.t[i]
+        h1[edge[1], edge[0]] = -hamiltonian.t[i]
+    h2 = np.zeros((norb, norb, norb, norb))
+    np.fill_diagonal(h2, hamiltonian.U)
+    return mol, h1, h2, norb, n_elec, nelec
 
 def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: bool=True, fixed_magnetization: bool=True):
     """
