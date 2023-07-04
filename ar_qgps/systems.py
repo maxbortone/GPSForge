@@ -144,7 +144,7 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
 
     # Setup Hamiltonian
     ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
-    return ha, loc_coeff
+    return ha
 
 def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     """
