@@ -51,6 +51,8 @@ def main(argv):
         train.vmc(config, workdir)
     elif config.trainer == 'ar_state_fitting':
         train.ar_state_fitting(config, workdir)
+    elif config.trainer == 'benchmark':
+        train.benchmark(config, workdir)
     else:
         raise app.UsageError(f"Unknown trainer: {config.trainer}")
 
