@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import netket as nk
 import GPSKet as qk
@@ -9,12 +10,13 @@ from pyscf import scf, gto, ao2mo, lo
 from VMCutils import MPIVars
 
 
-def get_system(config : ConfigDict) -> AbstractOperator:
+def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     """
     Return the Hamiltonian for a system
 
     Args:
         config : experiment configuration file
+        workdir : working directory (optional)
 
     Returns:
         Hamiltonian for the system
@@ -23,7 +25,7 @@ def get_system(config : ConfigDict) -> AbstractOperator:
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
     elif name in ['Hchain', 'Hsheet', 'H2O']:
-        return get_molecular_system(config.system)
+        return get_molecular_system(config.system, workdir=workdir)
     elif 'Hubbard' in name:
         return get_Hubbard_system(config.system)
 
@@ -51,12 +53,13 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, total_sz=config.total_sz, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
-def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
+def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHamiltonianOnTheFly:
     """
     Return the Hamiltonian for a molecular system
 
     Args:
         config : system configuration dictionary
+        workdir : working directory
 
     Returns:
         Hamiltonian for the molecular system
@@ -91,41 +94,48 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
 
     # Get hamiltonian elements
     if MPIVars.rank == 0:
-        # 1-electron 'core' hamiltonian terms, transformed into MO basis
-        h1 = np.linalg.multi_dot((myhf.mo_coeff.T, myhf.get_hcore(), myhf.mo_coeff))
-
-        # Get 2-electron electron repulsion integrals, transformed into MO basis
-        eri = ao2mo.incore.general(myhf._eri, (myhf.mo_coeff,)*4, compact=False)
-
-        # Previous representation exploited permutational symmetry in storage. Change this to a 4D array.
-        # Integrals now stored as h2[p,q,r,s] = (pq|rs) = <pr|qs>. Note 8-fold permutational symmetry.
-        h2 = ao2mo.restore(1, eri, norb)
-
         # Transform to a local orbital basis if wanted
-        if 'local' in config.basis:
-            loc_coeff = lo.orth_ao(mol, 'lowdin')
-            if 'boys' in config.basis:
-                localizer = lo.Boys(mol, mo_coeff=loc_coeff)
-                localizer.init_guess = None
-                loc_coeff = localizer.kernel()
-            elif 'pipek-mezey' in config.basis:
-                loc_coeff = lo.PipekMezey(mol, mo_coeff=loc_coeff).kernel()
-            elif 'edmiston-ruedenberg' in config.basis:
-                loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=loc_coeff).kernel()
-            elif 'split' in config.basis:
-                localizer = lo.Boys(mol, myhf.mo_coeff[:,:nelec//2])
-                loc_coeff_occ = localizer.kernel()
-                localizer = lo.Boys(mol, myhf.mo_coeff[:, nelec//2:])
-                loc_coeff_vrt = localizer.kernel()
-                loc_coeff = np.concatenate((loc_coeff_occ, loc_coeff_vrt), axis=1)
+        if workdir is None:
+            workdir = os.getcwd()
+        basis_path = os.path.join(workdir, "basis.npy")
+        if os.path.exists(basis_path):
+            loc_coeff = np.load(basis_path)
+        else:
+            if 'local' in config.basis:
+                loc_coeff = lo.orth_ao(mol, 'lowdin')
+                if 'boys' in config.basis:
+                    localizer = lo.Boys(mol, mo_coeff=loc_coeff)
+                    localizer.init_guess = None
+                    loc_coeff = localizer.kernel()
+                elif 'pipek-mezey' in config.basis:
+                    loc_coeff = lo.PipekMezey(mol, mo_coeff=loc_coeff).kernel()
+                elif 'edmiston-ruedenberg' in config.basis:
+                    loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=loc_coeff).kernel()
+                elif 'split' in config.basis:
+                    localizer = lo.Boys(mol, myhf.mo_coeff[:,:nelec//2])
+                    loc_coeff_occ = localizer.kernel()
+                    localizer = lo.Boys(mol, myhf.mo_coeff[:, nelec//2:])
+                    loc_coeff_vrt = localizer.kernel()
+                    loc_coeff = np.concatenate((loc_coeff_occ, loc_coeff_vrt), axis=1)
+                elif config.basis == 'canonical':
+                    loc_coeff = myhf.mo_coeff
+                else:
+                    raise ValueError("Unknown basis, please choose between: 'canonical', 'local-boys', 'local-pipek-mezey', 'local-edmiston-ruedenberg' and 'local-split'.")
+            np.save(basis_path, loc_coeff)
+        h1_path = os.path.join(workdir, "h1.npy")
+        h2_path = os.path.join(workdir, "h2.npy")
+        if os.path.exists(h1_path) and os.path.exists(h2_path):
+            h1 = np.load(h1_path)
+            h2 = np.load(h2_path)
+        else:
             ovlp = myhf.get_ovlp()
             # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
             assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
-            # Find the hamiltonian in the local basis
-            hij_local = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
-            hijkl_local = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
-            h1 = hij_local
-            h2 = hijkl_local
+            # Find the hamiltonian the basis
+            h1 = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
+            h2 = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
+            np.save(h1_path, h1)
+            np.save(h2_path, h2)
     else:
         h1 = None
         h2 = None
@@ -134,7 +144,7 @@ def get_molecular_system(config : ConfigDict) -> AbInitioHamiltonianOnTheFly:
 
     # Setup Hamiltonian
     ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
-    return ha
+    return ha, loc_coeff
 
 def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     """

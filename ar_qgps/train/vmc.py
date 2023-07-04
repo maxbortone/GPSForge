@@ -58,7 +58,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     """Trains an Ansatz on a system using VMC."""
 
     # Setup system
-    ha = get_system(config)
+    ha = get_system(config, workdir=workdir)
     hi = ha.hilbert
     g = ha.graph if hasattr(ha, 'graph') else None
 
