@@ -1,3 +1,4 @@
+import sys
 import math
 from ml_collections.config_dict import placeholder
 from ml_collections import ConfigDict
@@ -103,4 +104,10 @@ def get_Hubbard2d_config() -> ConfigDict:
     config.U = 1.0
     config.pbc = 'PBC-APBC'
     config.n_elec = (8, 8)
+    return config
+
+def get_config(system) -> ConfigDict:
+    get_system_config = getattr(sys.modules[__name__], f"get_{system}_config")
+    config = ConfigDict()
+    config.system = get_system_config()
     return config

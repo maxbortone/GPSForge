@@ -38,7 +38,7 @@ def resolve(config: ConfigDict) -> ConfigDict:
     else:
         seed = None
     seed = MPIVars.comm.bcast(seed, root=0)
-    if config.variational_state_name != 'ExactState' and config.variational_state.get('seed', None) is None:
+    if config.get('variational_state', None) and config.variational_state_name != 'ExactState' and config.variational_state.get('seed', None) is None:
         config.variational_state.seed = seed
 
     # Resolve molecular configuration
@@ -51,7 +51,7 @@ def resolve(config: ConfigDict) -> ConfigDict:
                 config.system.set_molecule = config.system.set_molecule.__name__
 
     # Support dimension can be int or tuple
-    if config.model.get('M', None) and isinstance(config.model.M, str):
+    if config.get('model', None) and config.model.get('M', None) and isinstance(config.model.M, str):
         M = config.model.M.split(',')
         if len(M) > 1:
             M = tuple(map(int, M))
