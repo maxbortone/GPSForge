@@ -49,6 +49,8 @@ def main(argv):
 
     if config.trainer == 'vmc':
         train.vmc(config, workdir)
+    elif config.trainer == 'vmc_block':
+        train.vmc_block(config, workdir)
     elif config.trainer == 'ar_state_fitting':
         train.ar_state_fitting(config, workdir)
     elif config.trainer == 'benchmark':
