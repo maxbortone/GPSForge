@@ -117,10 +117,10 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
                     localizer = lo.Boys(mol, myhf.mo_coeff[:, nelec//2:])
                     loc_coeff_vrt = localizer.kernel()
                     loc_coeff = np.concatenate((loc_coeff_occ, loc_coeff_vrt), axis=1)
-                elif config.basis == 'canonical':
-                    loc_coeff = myhf.mo_coeff
-                else:
-                    raise ValueError("Unknown basis, please choose between: 'canonical', 'local-boys', 'local-pipek-mezey', 'local-edmiston-ruedenberg' and 'local-split'.")
+            elif config.basis == 'canonical':
+                loc_coeff = myhf.mo_coeff
+            else:
+                raise ValueError("Unknown basis, please choose between: 'canonical', 'local-boys', 'local-pipek-mezey', 'local-edmiston-ruedenberg' and 'local-split'.")
             np.save(basis_path, loc_coeff)
         h1_path = os.path.join(workdir, "h1.npy")
         h2_path = os.path.join(workdir, "h2.npy")
