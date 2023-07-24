@@ -146,7 +146,7 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
     ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
     return ha
 
-def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
+def get_Hubbard_system(config: ConfigDict, return_graph: bool=False) -> FermiHubbardOnTheFly:
     """
     Return the Hamiltonian for Hubbard system at half-filling
 
@@ -183,12 +183,16 @@ def get_Hubbard_system(config: ConfigDict) -> FermiHubbardOnTheFly:
     # Setup Hamiltonian
     edges = np.array(g.edges())
     t = np.ones(edges.shape[0])*config.t
-    if Ly > 1 and 'APBC' in config.pbc:
-        for i, edge in enumerate(edges):
-            if np.abs(edge[0]-edge[1]) // config.Ly == (config.Lx-1):
-                t[i] *= -1.0
+    if Ly > 1:
+        if 'APBC' in config.pbc:
+            for i, edge in enumerate(edges):
+                if np.abs(edge[0]-edge[1]) // config.Ly == (config.Lx-1):
+                    t[i] *= -1.0
     else:
         if config.pbc and Lx % 4 == 0:
             t[-1] *= -1.0
     ha = FermiHubbardOnTheFly(hi, edges, U=U, t=t)
-    return ha
+    if return_graph:
+        return ha, g
+    else:
+        return ha
