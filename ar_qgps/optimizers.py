@@ -30,6 +30,9 @@ def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalS
     elif config.optimizer_name == 'Adam':
         op = nk.optimizer.Adam(learning_rate=config.optimizer.learning_rate, b1=config.optimizer.b1, b2=config.optimizer.b2)
         sr = None
+    elif config.optimizer_name == 'RMSProp':
+        op = nk.optimizer.RmsProp(learning_rate=config.optimizer.learning_rate, beta=config.optimizer.decay, epscut=config.optimizer.eps)
+        sr = None
     elif config.optimizer_name == 'SRDense':
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         qgt = nk.optimizer.qgt.QGTJacobianDense

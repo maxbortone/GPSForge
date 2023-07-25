@@ -13,6 +13,13 @@ def get_Adam_config() -> ConfigDict:
     config.b2 = 0.999
     return config
 
+def get_RMSProp_config() -> ConfigDict:
+    config = ConfigDict()
+    config.learning_rate = 0.01
+    config.decay = 0.9
+    config.eps = 1e-8
+    return config
+
 def get_SRDense_config() -> ConfigDict:
     config = ConfigDict()
     config.learning_rate = 0.01
