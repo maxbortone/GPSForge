@@ -2,8 +2,10 @@ import os
 import time
 import ml_collections
 import jax
+import jax.numpy as jnp
 import numpy as np
 import netket as nk
+import GPSKet as qk
 from copy import deepcopy
 from absl import logging
 from netket.utils.types import Callable, PyTree, Array
@@ -14,9 +16,24 @@ from VMCutils import MPIVars, Timer, CSVLogger
 from VMCutils import restore_best_params, save_best_params
 
 
-@jax.jit
-def solve(A, b):
-    return jax.scipy.sparse.linalg.cg(A, b)[0]
+def get_block_idx(config: ml_collections.ConfigDict, hilbert: qk.hilbert.FermionicDiscreteHilbert) -> PyTree:
+    M = config.model.M
+    D = hilbert._local_size
+    norb = hilbert.size
+    nelec = np.sum(hilbert._n_elec)
+    total_bond_dim = M*norb*nelec
+    block_idx = []
+    for k in range(norb):
+        idx = []
+        for n in range(D):
+            for i in range(nelec):
+                for m in range(M):
+                    for l in range(norb):
+                        idx.append(n*total_bond_dim+(i*nelec+m)*norb+l+k*norb*norb)
+        idx = np.array(idx, np.int32)
+        block_idx.append(idx)
+    block_idx = jnp.array(block_idx, np.int32)
+    return block_idx
 
 def get_apply_fun_block(vstate: nk.vqs.MCState) -> Callable:
     def apply_fun_block(variables: PyTree, x: Array):
@@ -59,17 +76,39 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
     # Sampler
     sa = get_sampler(config, hi, g)
 
+    # Quantum geometric tensor
+    solver = jax.scipy.sparse.linalg.cg
+    qgt = qk.optimizer.qgt.QGTJacobianDenseRMSProp
+
     # Variational state
     vs = nk.vqs.MCState(sa, ma, **config.variational_state)
+    _, unravel_fun = nk.jax.tree_ravel(vs.parameters.unfreeze())
 
     # Block variational state
+    block_size = vs.n_parameters // hi.size
     vs_block = deepcopy(vs)
     vs_block._apply_fun = get_apply_fun_block(vs)
-    vs_block._init_fun = get_init_fun_block(vs, config.optimizer.block_size)
+    vs_block._init_fun = get_init_fun_block(vs, block_size)
     vs_block.init()
-
-    # Quantum geometric tensor
-    qgt = nk.optimizer.qgt.QGTJacobianDense(mode=config.optimizer.mode)
+    block_idx = get_block_idx(config, hi)
+    ema = jnp.zeros(nk.jax.tree_size(vs.parameters))
+    def update_ema(nu, g, step):
+        if jnp.iscomplexobj(g):
+            # This assumes that the parameters are split into complex and real parts later on (done in the QGT implementation)
+            squared_g = (g.real**2 + 1.j * g.imag**2)
+        else:
+            squared_g = (g**2)
+        ema = config.optimizer.decay*nu + (1-config.optimizer.decay)*squared_g
+        return ema/(1-config.optimizer.decay**step)
+    def update_block(model_params, samples, idx, g, e):
+        block = jnp.take(model_params, idx)
+        vs_block.parameters = {'block': block}
+        vs_block.model_state = {'block_idx': idx, 'model_params': unravel_fun(model_params)}
+        vs_block._samples = samples
+        lhs = qgt(vs_block, e, diag_shift=config.optimizer.diag_shift, eps=config.optimizer.eps, mode=config.optimizer.mode)
+        dp_block, _ = lhs.solve(solver, g)
+        return dp_block
+    update_blocks = jax.jit(jax.vmap(update_block, in_axes=(None, None, 0, 0, 0)))
 
     # Logger
     if MPIVars.rank == 0:
@@ -90,23 +129,19 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
         # Compute energy and gradient
         energy, grad = vs.expect_and_grad(ha)
         grad, unravel_fun = nk.jax.tree_ravel(grad)
+        grad_block = jax.vmap(lambda idx: jnp.take(grad, idx))(block_idx)
 
-        # Find parameters with largest gradient
-        model_params, unravel_fun = nk.jax.tree_ravel(vs.parameters.unfreeze())
-        block_idx = np.argsort(np.linalg.norm(grad))[-config.optimizer.block_size:]
-        block = model_params[block_idx]
-        vs_block.parameters = {'block': block}
-        vs_block.model_state = {'block_idx': block_idx, 'model_params': unravel_fun(model_params)}
+        # Update exponential moving average (EMA)
+        ema = update_ema(ema, grad, step)
+        ema_block = jax.vmap(lambda idx: jnp.take(ema, idx))(block_idx)
 
-        # Find SR update of block of parameters
-        vs_block._samples = vs.samples
-        S_block = qgt(vs_block, diag_shift=config.optimizer.diag_shift).to_dense()
-        grad_block = grad[block_idx]
-        dp_block = solve(S_block, grad_block)
-
-        # Combine block update with other parameters
-        dp = grad
-        dp = dp.at[block_idx].set(dp_block)
+        # Vmap over blocks
+        model_params, _ = nk.jax.tree_ravel(vs.parameters.unfreeze())
+        block_dp = update_blocks(model_params, vs.samples, block_idx, grad_block, ema_block)
+        
+        # Combine block updates
+        dp = jnp.zeros_like(grad)
+        dp = jax.tree_util.tree_map(lambda i, j: dp.at[i].set(j), block_idx, block_dp)
 
         # Update parameters
         model_params = model_params - config.optimizer.learning_rate * dp

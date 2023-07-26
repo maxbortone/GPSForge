@@ -4,7 +4,7 @@ from ar_qgps.configs import systems
 from ar_qgps.configs import models
 from ar_qgps.configs import samplers
 from ar_qgps.configs.variational_states import get_MCState_config
-from ar_qgps.configs.optimizers import get_SRDense_config
+from ar_qgps.configs.optimizers import get_SRRMSProp_config
 
 
 def get_config(modules) -> ConfigDict:
@@ -35,8 +35,7 @@ def get_config(modules) -> ConfigDict:
     config.variational_state = get_MCState_config(config)
 
     # Optimizer
-    config.optimizer_name = "BlockSR"
-    config.optimizer = get_SRDense_config()
-    config.optimizer.block_size = 2
+    config.optimizer_name = "BlockSRRMSProp"
+    config.optimizer = get_SRRMSProp_config()
 
     return config.lock()
