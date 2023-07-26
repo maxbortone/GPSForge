@@ -37,7 +37,7 @@ def main(argv):
     mol, h1, h2, norb, n_elec, nelec = setup_mol(config, hamiltonian)
 
     # Compute FCI energy
-    energy_mo, _ = fci.direct_spin1.FCI().kernel(h1, h2, norb, nelec)
+    energy_mo, _ = fci.direct_spin0.FCI().kernel(h1, h2, norb, nelec)
     energy_nuc = mol.energy_nuc()
     exact_energy = energy_mo + energy_nuc
 
