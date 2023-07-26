@@ -96,6 +96,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
 
     # Run training loop
     if MPIVars.rank == 0:
+        logging.info(f"Model has {vs.n_parameters} parameters")
         logging.info('Starting training loop; initial compile can take a while...')
         timer = Timer(config.total_steps)
         t0 = time.time()
