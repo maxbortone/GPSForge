@@ -65,14 +65,20 @@ def get_Hubbard_exact_energy(config: ConfigDict, hamiltonian : AbstractOperator=
     Ly = config.get('Ly', 1)
     t = config.t
     U = config.U
-    bc = "APBC" if config.pbc else "OBC"
     if Ly == 1:
+        bc = "APBC" if config.pbc else "OBC"
         path = os.path.join(base_path, 'data/result_DMRG_Hubbard_1D.csv')
         df = pd.read_csv(path, dtype={'L': np.int16, 't': np.float32, 'U': np.float32, 'BC': str, 'M_max': np.int32, 'E': np.float32})
         row = df.query('L == @Lx and t == @t and U == @U and BC == @bc')
         exact_energy = row['E'].values[0]
     else:
-        raise ValueError("No data available for 2D Hubbard systems.")
+        nelec = np.sum(hamiltonian.hilbert._n_elec)
+        n = nelec / (Lx*Ly)
+        bc = config.pbc
+        path = os.path.join(base_path, 'data/result_FCI_Hubbard_2D.csv')
+        df = pd.read_csv(path, dtype={'Lx': np.int16, 'Ly': np.int16, 't': np.float32, 'U': np.float32, 'n': np.float32, 'BC': str, 'E': np.float32})
+        row = df.query('Lx == @Lx and Ly == @Ly and t == @t and U == @U and n == @n and BC == @bc')
+        exact_energy = row['E'].values[0]
     if exact_energy is None and hamiltonian is not None:
         exact_energy = eigsh(hamiltonian.to_sparse(), k=1, which='SA', return_eigenvectors=False)[0]
     return exact_energy
