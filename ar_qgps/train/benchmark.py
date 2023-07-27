@@ -5,6 +5,8 @@ import numpy as np
 import netket as nk
 import GPSKet as qk
 import jax.numpy as jnp
+import pandas as pd
+import plotext as plt
 from absl import logging
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -61,19 +63,29 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
     if MPIVars.rank == 0:
         fieldnames = ["Component", "Runtime"]
         logger = CSVLogger(os.path.join(workdir, "runtimes.csv"), fieldnames)
+        total_steps = 4 if sr is not None else 3
 
     # Benchmark compilation
+    def advance(vs, sr):
+        samples = vs.sample()
+        samples = samples.reshape((-1, samples.shape[-1]))
+        vs.log_value(samples)
+        energy, grad = vs.expect_and_grad(ha)
+        if sr is not None:
+            sr(vs, grad, 1)
+        return
+
     if MPIVars.rank == 0:
-        logging.info("[0/4] Benchmarking compilation...")
-    _, runtime = timeit(vmc.advance, 1, repeat=config.repeat)
+        logging.info(f"[0/{total_steps}] Benchmarking compilation...")
+    _, runtime = timeit(advance, vs, sr, repeat=config.repeat)
     if MPIVars.rank == 0:
         logger(0, {"Component": "Compilation", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark sampling
-    _ = vs.sample()
+    vs.reset()
     if MPIVars.rank == 0:
-        logging.info("[1/4] Benchmarking sampling...")
+        logging.info(f"[1/{total_steps}] Benchmarking sampling...")
     samples, runtime = timeit(vs.sample, repeat=config.repeat)
     samples = samples.reshape((-1, samples.shape[-1]))
     if MPIVars.rank == 0:
@@ -81,30 +93,34 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark amplitude evaluation
-    _ = vs.log_value(samples)
     if MPIVars.rank == 0:
-        logging.info("[2/4] Benchmarking amplitude evaluation...")
+        logging.info(f"[2/{total_steps}] Benchmarking amplitude evaluation...")
     # samples = jnp.squeeze(samples)
     _, runtime = timeit(vs.log_value, samples, repeat=config.repeat)
     if MPIVars.rank == 0:
         logger(2, {"Component": "Amplitude", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
-    # Benchmark local energy evaluation
-    _ = vs.local_estimators(ha)
+    # Benchmark energy and gradient evaluation
     if MPIVars.rank == 0:
-        logging.info("[3/4] Benchmarking local energy evaluation...")
-    _, runtime = timeit(vs.local_estimators, ha, repeat=config.repeat)
+        logging.info(f"[3/{total_steps}] Benchmarking energy and gradient evaluation...")
+    (energy, grad), runtime = timeit(vs.expect_and_grad, ha, repeat=config.repeat)
     if MPIVars.rank == 0:
-        logger(3, {"Component": "Local energy", "Runtime": runtime})
+        logger(3, {"Component": "Energy", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
-    # Benchmark optimization step
-    if MPIVars.rank == 0:
-        logging.info("[4/4] Benchmarking optimization step...")
-    _, runtime = timeit(vmc._forward_and_backward, repeat=config.repeat)
-    if MPIVars.rank == 0:
-        logger(4, {"Component": "Optimization", "Runtime": runtime})
-        logging.info(f"Done! This took {runtime} seconds.")
+    # Benchmark preconditioner evaluation
+    if sr is not None:
+        if MPIVars.rank == 0:
+            logging.info(f"[4/{total_steps}] Benchmarking preconditioner evaluation...")
+        _, runtime = timeit(sr, vs, grad, 1, repeat=config.repeat)
+        if MPIVars.rank == 0:
+            logger(4, {"Component": "Preconditioner", "Runtime": runtime})
+            logging.info(f"Done! This took {runtime} seconds.")
+
+    # Plot to terminal
+    df = pd.read_csv(os.path.join(workdir, "runtimes.csv"), header=0, delimiter=",")
+    plt.simple_bar(df["Component"], df["Runtime"], width=100, title="Runtime (s)")
+    plt.show()
 
     return 
