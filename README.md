@@ -40,7 +40,7 @@ Currently the following options are available:
     - `MCState`: Monte Carlo variational quantum state
     - `MCStateUniqueSamples`: Monte Carlo variational quantum state with support for unique samples
     - `MCStateStratifiedSampling`: Monte Carlo variational quantum state with support for stratified sampling
-    - `ExactState`: exact quantum state (computes expectation values over the whole Hilbert space)
+    - `FullSumState`: exact quantum state that computes expectation values over the whole Hilbert space
 - Optimizer:
     - `Sgd`: Stochastic gradient descent optimizer
     - `Adam`: Adam optimizer

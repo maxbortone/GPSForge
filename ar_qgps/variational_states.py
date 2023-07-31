@@ -10,7 +10,7 @@ from VMCutils import MPIVars
 
 
 _VARIATIONAL_STATES = {
-    'ExactState': nk.vqs.ExactState,
+    'FullSumState': nk.vqs.FullSumState,
     'MCState': nk.vqs.MCState,
     'MCStateUniqueSamples': qk.vqs.MCStateUniqueSamples,
     'MCStateStratifiedSampling': qk.vqs.MCStateStratifiedSampling

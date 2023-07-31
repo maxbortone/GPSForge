@@ -11,7 +11,7 @@ def get_MCState_config(parent : ConfigDict) -> ConfigDict:
     config.seed = placeholder(int)
     return config
 
-def get_ExactState_config(parent : ConfigDict) -> ConfigDict:
+def get_FullSumState_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     return config
 
