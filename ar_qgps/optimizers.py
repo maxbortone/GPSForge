@@ -1,10 +1,11 @@
 import jax
+import optax
 import netket as nk
 import GPSKet as qk
 from ml_collections import ConfigDict
 from netket.vqs import VariationalState
 from netket.optimizer import LinearOperator
-from optax import GradientTransformation
+from optax import GradientTransformation, Schedule
 from typing import Tuple, Optional, Union
 
 
@@ -12,6 +13,27 @@ _SOLVERS = {
     'pinv': qk.optimizer.pinv,
     'cg': jax.scipy.sparse.linalg.cg
 }
+
+def get_schedule(config : ConfigDict) -> Schedule:
+    """
+    Return the schedule specified in the config
+    
+    Args:
+        config : configuration dictionary of the scheduled quantity
+
+    Returns:
+        optax schedule function
+    """
+    schedule_fn = getattr(optax, config.schedule_name)
+    kwargs = config.to_dict()
+    kwargs.pop('schedule_name')
+    if 'boundaries_and_scales' in kwargs.keys():
+        # NOTE: ml_collections doesn't allow int keys in dicts, this is a workaround
+        boundaries_and_scales = kwargs.pop('boundaries_and_scales')
+        boundaries = list(map(int, boundaries_and_scales.keys()))
+        scales = list(map(float, boundaries_and_scales.values()))
+        kwargs['boundaries_and_scales'] = dict(zip(boundaries, scales))
+    return schedule_fn(**kwargs)
 
 def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalState]=None) -> Tuple[GradientTransformation,Union[None, LinearOperator]]:
     """
@@ -50,11 +72,15 @@ def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalS
             variational_state.parameters
         )
         solver = _SOLVERS[config.optimizer.solver]
+        if isinstance(config.optimizer.diag_shift, ConfigDict):
+            diag_shift = get_schedule(config.optimizer.diag_shift)
+        else:
+            diag_shift = config.optimizer.diag_shift
         sr = qk.optimizer.SRRMSProp(
             pars_struct,
             qk.optimizer.qgt.QGTJacobianDenseRMSProp,
             solver=solver,
-            diag_shift=config.optimizer.diag_shift,
+            diag_shift=diag_shift,
             decay=config.optimizer.decay,
             eps=config.optimizer.eps,
             mode=config.optimizer.mode
