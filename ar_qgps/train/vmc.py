@@ -1,12 +1,12 @@
 import os
 import time
+import flax
 import ml_collections
 import numpy as np
 import netket as nk
 import GPSKet as qk
 import jax.numpy as jnp
 from absl import logging
-from typing import Union
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
 from ar_qgps.samplers import get_sampler
@@ -17,6 +17,8 @@ from VMCutils import restore_best_params, save_best_params
 from flax import serialization
 from flax.training.checkpoints import save_checkpoint, restore_checkpoint
 
+
+flax.config.update('flax_use_orbax_checkpointing', False)
 
 def serialize_VMC(driver: nk.driver.VMC):
     # TODO: serialize sampler state
@@ -139,6 +141,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
 
         # Store checkpoint
         if MPIVars.rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == total_steps):
+            # TODO: migrate to new orbax API (see: https://flax.readthedocs.io/en/latest/guides/use_checkpointing.htm)
             checkpoint_path = save_checkpoint(checkpoints_dir, vmc, step, keep_every_n_steps=config.checkpoint_every)
             logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")
 
