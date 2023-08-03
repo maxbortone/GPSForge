@@ -44,5 +44,4 @@ def get_minSR_config() -> ConfigDict:
     config.learning_rate = 0.01
     config.mode = 'real'
     config.rcond = 1e-12
-    config.diag_shift = 0.0
     return config

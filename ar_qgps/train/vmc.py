@@ -79,7 +79,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     # Driver
     if config.optimizer_name == 'minSR':
         solver = lambda A, b: jnp.linalg.lstsq(A, b, rcond=config.optimizer.rcond)[0]
-        vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver, diag_shift=config.optimizer.diag_shift)
+        vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
     else:
         vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
