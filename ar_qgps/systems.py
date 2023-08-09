@@ -7,6 +7,7 @@ from netket.operator import AbstractOperator, Heisenberg
 from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
 from GPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
+from pyscf.mcscf.casci import CASCI
 from VMCutils import MPIVars
 
 
@@ -24,8 +25,11 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name in ['Hchain', 'Hsheet', 'H2O']:
-        return get_molecular_system(config.system, workdir=workdir)
+    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2']:
+        if config.system.get('frozen_electrons', None) is not None:
+            return get_frozen_core_molecular_system(config.system, workdir=workdir)
+        else:
+            return get_molecular_system(config.system, workdir=workdir)
     elif 'Hubbard' in name:
         return get_Hubbard_system(config.system)
 
@@ -136,6 +140,116 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
             h2 = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
+    else:
+        h1 = None
+        h2 = None
+    h1 = MPIVars.comm.bcast(h1, root=0)
+    h2 = MPIVars.comm.bcast(h2, root=0)
+
+    # Setup Hamiltonian
+    ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
+    return ha
+
+def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHamiltonianOnTheFly:
+    """
+    Return the Hamiltonian for a molecular system with a frozen core
+
+    Args:
+        config : system configuration dictionary
+        workdir : working directory
+
+    Returns:
+        Hamiltonian for the molecular system
+    """
+    # Setup Hilbert space
+    if config.get('atom', None):
+        atom = config.atom
+    else:
+        atom = config.molecule
+    if MPIVars.rank == 0:
+        frozen_electrons = config.frozen_electrons
+        mol = gto.Mole()
+        mol.build(
+            atom=atom,
+            basis=config.basis_set,
+            symmetry=config.symmetry,
+            unit=config.unit
+        )
+        nelec = mol.nelectron-frozen_electrons
+        print('Number of electrons: ', nelec)
+
+        mf = scf.RHF(mol)
+        if config.get('sfx2c1e', None):
+            mf = scf.sfx2c1e(mf)
+        mf.scf()
+        norb = mf.mo_coeff.shape[1]-frozen_electrons//2
+        print('Number of molecular orbitals: ', norb)
+    else:
+        norb = None
+        nelec = None
+    norb = MPIVars.comm.bcast(norb, root=0)
+    nelec = MPIVars.comm.bcast(nelec, root=0)
+
+    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=(nelec//2,nelec//2))
+
+    # Get hamiltonian elements
+    if MPIVars.rank == 0:
+        # Load hamiltonian elements if they exist
+        if workdir is None:
+            workdir = os.getcwd()
+        basis_path = os.path.join(workdir, "basis.npy")
+        h1_path = os.path.join(workdir, "h1.npy")
+        h2_path = os.path.join(workdir, "h2.npy")
+        ecore_path = os.path.join(workdir, "ecore.npy")
+        if (os.path.exists(basis_path) and
+                os.path.exists(h1_path) and
+                os.path.exists(h2_path) and
+                os.path.exists(ecore_path)):
+            basis = np.load(basis_path)
+            h1 = np.load(h1_path)
+            h2 = np.load(h2_path)
+            e_core = np.load(ecore_path)[0]
+        else:
+            # Compute molecular orbitals in active space
+            casci = CASCI(mf, norb, nelec)
+            mo_coeff = casci.mo_coeff[
+                :, casci.ncore : casci.ncore + casci.ncas
+            ]
+            # Transform to a local orbital basis if wanted
+            if 'local' in config.basis:
+                if 'boys' in config.basis:
+                    localizer = lo.Boys(mol, mo_coeff=mo_coeff)
+                    localizer.init_guess = None
+                    loc_coeff = localizer.kernel()
+                basis = loc_coeff
+            elif config.basis == 'canonical':
+                basis = mo_coeff
+            else:
+                raise ValueError("Unknown basis, please choose between: 'canonical' and 'local-boys'.")
+            ovlp = mf.get_ovlp()
+            # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
+            assert(np.allclose(np.linalg.multi_dot((basis.T, ovlp, basis)), np.eye(norb)))
+            # Find the hamiltonian the basis
+            h1, e_core = casci.get_h1cas()
+            h2 = ao2mo.restore(1, casci.get_h2cas(), norb)
+            if 'local' in config.basis:
+                canonical_to_local_trafo = basis.T.dot(ovlp.dot(mo_coeff))
+                h1 = np.linalg.multi_dot(
+                    (canonical_to_local_trafo, h1, canonical_to_local_trafo.T)
+                )
+                h2 = np.einsum(
+                    "ijkl,ai,bj,ck,dl->abcd",
+                    h2,
+                    canonical_to_local_trafo,
+                    canonical_to_local_trafo,
+                    canonical_to_local_trafo,
+                    canonical_to_local_trafo,
+                    optimize=True,
+                )
+            np.save(basis_path, basis)
+            np.save(h1_path, h1)
+            np.save(h2_path, h2)
+            np.save(ecore_path, e_core)
     else:
         h1 = None
         h2 = None

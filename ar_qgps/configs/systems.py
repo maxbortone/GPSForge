@@ -23,6 +23,31 @@ def sheet(config):
     config.system.molecule = molecule
     return config
 
+def diatomic(config):
+    atom1 = atom2 = config.system.molecule_name.strip('2')
+    atoms = (atom1, atom2)
+    pos = (config.system.bond_length * config.system.bond_length_multiple) / 2
+    coords = ((-pos, 0., 0.), (pos, 0., 0.))
+    config.system.molecule = [
+        (a, c) for a, c in zip(atoms, coords)
+    ]
+    return config
+
+def get_Cr2_config() -> ConfigDict:
+    config = ConfigDict()
+    config.molecule_name = 'Cr2'
+    config.bond_length = 1.68
+    config.bond_length_multiple = 1.0
+    config.molecule = placeholder(list)
+    config.basis_set = 'cc-pvdz-dk'
+    config.basis = 'canonical'
+    config.symmetry=True
+    config.unit = 'Angstrom'
+    config.frozen_electrons = 20 # Neon frozen core: 10 per atom
+    with config.ignore_type():
+        config.set_molecule = diatomic
+    return config
+
 def get_Heisenberg1d_config() -> ConfigDict:
     config = ConfigDict()
     config.Lx = 10
