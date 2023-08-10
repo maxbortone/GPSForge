@@ -1,3 +1,4 @@
+import os
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -30,7 +31,7 @@ _MODELS = {
     'BackflowCPD': qk.models.Backflow,
 }
 
-def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None, hamiltonian : Hamiltonian = None) -> nn.Module:
+def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None, hamiltonian : Hamiltonian = None, workdir: str=None) -> nn.Module:
     """
     Return the model for a wavefunction Ansatz
 
@@ -39,6 +40,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         hilbert : Hilbert space on which the model should act
         graph : graph associated with the Hilbert space (optional)
         hamiltonian : Hamiltonian of the system (optional)
+        workdir : working directory (optional)
 
     Returns:
         the model for the wavefunction Ansatz
@@ -150,7 +152,10 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             config.model.restricted,
             config.model.fixed_magnetization
         )
-        orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
+        if config.system.get('frozen_electrons', None):
+            orbitals = get_hf_orbitals_from_file(config.system, workdir, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
+        else:
+            orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
@@ -515,6 +520,31 @@ def setup_mol(config : ConfigDict, hamiltonian : FermiHubbardOnTheFly):
     h2 = np.zeros((norb, norb, norb, norb))
     np.fill_diagonal(h2, hamiltonian.U)
     return mol, h1, h2, norb, n_elec, nelec
+
+def get_hf_orbitals_from_file(config: ConfigDict, workdir: str=None, restricted: bool=True, fixed_magnetization: bool=True) -> Array:
+    if MPIVars.rank == 0:
+        if workdir is None:
+            workdir = os.getcwd()
+        hf_orbitals_path = os.path.join(workdir, 'hf_orbitals.npy')
+        if os.path.exists(hf_orbitals_path):
+            hf_orbitals = np.load(hf_orbitals_path) # (norb, nelec//2)
+        else:
+            raise FileNotFoundError('No HF orbitals found in workdir')
+        if fixed_magnetization:
+            if restricted:
+                orbitals = hf_orbitals
+            else:
+                orbitals = np.concatenate([hf_orbitals, hf_orbitals], axis=1)
+        else:
+            norb = hf_orbitals.shape[0]
+            nelec = hf_orbitals.shape[1]*2
+            orbitals = np.zeros((2*norb, nelec))
+            orbitals[:norb, :nelec//2] = hf_orbitals
+            orbitals[norb:, nelec//2:] = hf_orbitals
+    else:
+        orbitals = None
+    orbitals = MPIVars.comm.bcast(orbitals, root=0)
+    return orbitals
 
 def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: bool=True, fixed_magnetization: bool=True):
     """

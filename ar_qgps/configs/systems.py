@@ -44,6 +44,7 @@ def get_Cr2_config() -> ConfigDict:
     config.symmetry=True
     config.unit = 'Angstrom'
     config.frozen_electrons = 20 # Neon frozen core: 10 per atom
+    config.sfx2c1e = True # spin-free exact two-component one-electron integrals
     with config.ignore_type():
         config.set_molecule = diatomic
     return config

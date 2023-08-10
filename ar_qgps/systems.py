@@ -200,15 +200,18 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         basis_path = os.path.join(workdir, "basis.npy")
         h1_path = os.path.join(workdir, "h1.npy")
         h2_path = os.path.join(workdir, "h2.npy")
-        ecore_path = os.path.join(workdir, "ecore.npy")
+        e_core_path = os.path.join(workdir, "e_core.npy")
+        hf_orbitals_path = os.path.join(workdir, "hf_orbitals.npy")
         if (os.path.exists(basis_path) and
                 os.path.exists(h1_path) and
                 os.path.exists(h2_path) and
-                os.path.exists(ecore_path)):
+                os.path.exists(e_core_path) and
+                os.path.exists(hf_orbitals_path)):
             basis = np.load(basis_path)
             h1 = np.load(h1_path)
             h2 = np.load(h2_path)
-            e_core = np.load(ecore_path)[0]
+            e_core = np.load(e_core_path)
+            hf_orbitals = np.load(hf_orbitals_path)
         else:
             # Compute molecular orbitals in active space
             casci = CASCI(mf, norb, nelec)
@@ -232,8 +235,8 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
             # Find the hamiltonian the basis
             h1, e_core = casci.get_h1cas()
             h2 = ao2mo.restore(1, casci.get_h2cas(), norb)
+            canonical_to_local_trafo = basis.T.dot(ovlp.dot(mo_coeff))
             if 'local' in config.basis:
-                canonical_to_local_trafo = basis.T.dot(ovlp.dot(mo_coeff))
                 h1 = np.linalg.multi_dot(
                     (canonical_to_local_trafo, h1, canonical_to_local_trafo.T)
                 )
@@ -246,10 +249,12 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
                     canonical_to_local_trafo,
                     optimize=True,
                 )
+            hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
             np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
-            np.save(ecore_path, e_core)
+            np.save(e_core_path, e_core)
+            np.save(hf_orbitals_path, hf_orbitals)
     else:
         h1 = None
         h2 = None
