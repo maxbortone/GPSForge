@@ -77,7 +77,9 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
 
     if MPIVars.rank == 0:
         logging.info(f"[0/{total_steps}] Benchmarking compilation...")
-    _, runtime = timeit(advance, vs, sr, repeat=config.repeat)
+    _, runtime_uncompiled = timeit(advance, vs, sr, repeat=config.repeat)
+    _, runtime_compiled = timeit(advance, vs, sr, repeat=config.repeat)
+    runtime = runtime_uncompiled - runtime_compiled
     if MPIVars.rank == 0:
         logger(0, {"Component": "Compilation", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
