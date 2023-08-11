@@ -36,7 +36,7 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
     """Benchmark a VMC Ansatz on a system"""
 
     # Setup system
-    ha = get_system(config)
+    ha = get_system(config, workdir)
     hi = ha.hilbert
     g = ha.graph if hasattr(ha, 'graph') else None
 
