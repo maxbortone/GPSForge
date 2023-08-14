@@ -144,7 +144,6 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             raise ValueError("Backflow Ansatz is only implemented for fermionic systems.")
         norb = hilbert.size
         nelec = np.sum(hilbert._n_elec)
-        init_fn = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
         out_trafo, total_supp_dim = get_backflow_out_transformation(
             config.model.M,
             norb,
@@ -153,9 +152,23 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             config.model.fixed_magnetization
         )
         if config.system.get('frozen_electrons', None):
-            orbitals = get_hf_orbitals_from_file(config.system, workdir, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
+            phi = get_hf_orbitals_from_file(config.system, workdir, restricted=config.model.restricted, 
+                                                    fixed_magnetization=config.model.fixed_magnetization)
+            def init_fn(key, shape, dtype):
+                epsilon = jnp.ones(shape, dtype=dtype)
+                epsilon = epsilon.at[:, : total_supp_dim, 0].set(
+                    phi.flatten()
+                )
+                epsilon = epsilon.at[:, total_supp_dim :, 0].set(0.0)
+                epsilon += jax.nn.initializers.normal(dtype=epsilon.dtype)(
+                    key, shape=epsilon.shape, dtype=dtype
+                )
+                return epsilon
+            orbitals = np.zeros_like(phi)
         else:
-            orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted, fixed_magnetization=config.model.fixed_magnetization)
+            init_fn = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+            orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted,      
+                                        fixed_magnetization=config.model.fixed_magnetization)
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
