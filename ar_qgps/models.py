@@ -160,7 +160,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                     phi.flatten()
                 )
                 epsilon = epsilon.at[:, total_supp_dim :, 0].set(0.0)
-                epsilon += jax.nn.initializers.normal(dtype=epsilon.dtype)(
+                epsilon += jax.nn.initializers.normal(config.model.sigma, dtype=epsilon.dtype)(
                     key, shape=epsilon.shape, dtype=dtype
                 )
                 return epsilon
