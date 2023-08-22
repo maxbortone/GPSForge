@@ -25,13 +25,15 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2']:
+    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2', 'Cr']:
         if config.system.get('frozen_electrons', None) is not None:
             return get_frozen_core_molecular_system(config.system, workdir=workdir)
         else:
             return get_molecular_system(config.system, workdir=workdir)
     elif 'Hubbard' in name:
         return get_Hubbard_system(config.system)
+    else:
+        raise ValueError(f"Could not find system with name {name}")
 
 def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     """
@@ -170,29 +172,38 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         atom = config.molecule
     if MPIVars.rank == 0:
         frozen_electrons = config.frozen_electrons
+        if config.get('n_elec', None):
+            n_elec = (config.n_elec[0]-frozen_electrons//2, config.n_elec[1]-frozen_electrons//2)
+            spin = n_elec[0]-n_elec[1]
+        else:
+            spin = 0
         mol = gto.Mole()
         mol.build(
             atom=atom,
             basis=config.basis_set,
             symmetry=config.symmetry,
-            unit=config.unit
+            unit=config.unit,
+            spin=spin
         )
         nelec = mol.nelectron-frozen_electrons
-        print('Number of electrons: ', nelec)
-
+        if config.get('n_elec', None) is None:
+            n_elec = (nelec//2, nelec//2)
         mf = scf.RHF(mol)
         if config.get('sfx2c1e', None):
             mf = scf.sfx2c1e(mf)
         mf.scf()
         norb = mf.mo_coeff.shape[1]-frozen_electrons//2
-        print('Number of molecular orbitals: ', norb)
+        print(f"Number of active molecular orbitals: {norb}")
+        print(f"Number of active α and β electrons: {n_elec}")
     else:
         norb = None
+        n_elec = None
         nelec = None
-    norb = MPIVars.comm.bcast(norb, root=0)
-    nelec = MPIVars.comm.bcast(nelec, root=0)
+    norb = MPIVars.comm.bcast(norb, root=0) # Number of active molecular orbitals
+    n_elec = MPIVars.comm.bcast(n_elec, root=0) # Number of active α and β electrons
+    nelec = MPIVars.comm.bcast(nelec, root=0) # Total number of active electrons
 
-    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=(nelec//2,nelec//2))
+    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=n_elec)
 
     # Get hamiltonian elements
     if MPIVars.rank == 0:

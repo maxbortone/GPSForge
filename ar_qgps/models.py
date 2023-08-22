@@ -153,12 +153,20 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         )
         if config.model.init_fun =='normal':
             init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
-            orbitals = get_hf_orbitals(
-                config.system,
-                hamiltonian,
-                restricted=config.model.restricted,      
-                fixed_magnetization=config.model.fixed_magnetization
-            )
+            if config.system.get('frozen_electrons', None):
+                orbitals = get_hf_orbitals_from_file(
+                    config.system,
+                    workdir,
+                    restricted=config.model.restricted, 
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
+            else:
+                orbitals = get_hf_orbitals(
+                    config.system,
+                    hamiltonian,
+                    restricted=config.model.restricted,      
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
         elif config.model.init_fun == 'hf':
             if config.system.get('frozen_electrons', None):
                 phi = get_hf_orbitals_from_file(

@@ -33,6 +33,19 @@ def diatomic(config):
     ]
     return config
 
+def get_Cr_config() -> ConfigDict:
+    config = ConfigDict()
+    config.molecule_name = 'Cr'
+    config.molecule = [('Cr', (0., 0., 0.))]
+    config.basis_set = 'cc-pvdz-dk'
+    config.basis = 'canonical'
+    config.symmetry=True
+    config.unit = 'Angstrom'
+    config.n_elec = (15, 9) # Number of α and β electrons
+    config.frozen_electrons = 10 # Neon frozen core
+    config.sfx2c1e = True # spin-free exact two-component one-electron integrals
+    return config
+
 def get_Cr2_config() -> ConfigDict:
     config = ConfigDict()
     config.molecule_name = 'Cr2'
