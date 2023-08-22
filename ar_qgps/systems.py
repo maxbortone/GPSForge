@@ -84,9 +84,9 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
         nelec = mol.nelectron
         print('Number of electrons: ', nelec)
 
-        myhf = scf.RHF(mol)
-        myhf.scf()
-        norb = myhf.mo_coeff.shape[1]
+        mf = scf.RHF(mol)
+        mf.scf()
+        norb = mf.mo_coeff.shape[1]
         print('Number of molecular orbitals: ', norb)
     else:
         norb = None
@@ -102,9 +102,16 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
         if workdir is None:
             workdir = os.getcwd()
         basis_path = os.path.join(workdir, "basis.npy")
-        if os.path.exists(basis_path):
-            loc_coeff = np.load(basis_path)
+        h1_path = os.path.join(workdir, "h1.npy")
+        h2_path = os.path.join(workdir, "h2.npy")
+        if (os.path.exists(basis_path) and
+                os.path.exists(h1_path) and
+                os.path.exists(h2_path)):
+            basis = np.load(basis_path)
+            h1 = np.load(h1_path)
+            h2 = np.load(h2_path)
         else:
+            # Transform to a local orbital basis if wanted
             if 'local' in config.basis:
                 loc_coeff = lo.orth_ao(mol, 'lowdin')
                 if 'boys' in config.basis:
@@ -116,28 +123,23 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
                 elif 'edmiston-ruedenberg' in config.basis:
                     loc_coeff = lo.EdmistonRuedenberg(mol, mo_coeff=loc_coeff).kernel()
                 elif 'split' in config.basis:
-                    localizer = lo.Boys(mol, myhf.mo_coeff[:,:nelec//2])
+                    localizer = lo.Boys(mol, mf.mo_coeff[:,:nelec//2])
                     loc_coeff_occ = localizer.kernel()
-                    localizer = lo.Boys(mol, myhf.mo_coeff[:, nelec//2:])
+                    localizer = lo.Boys(mol, mf.mo_coeff[:, nelec//2:])
                     loc_coeff_vrt = localizer.kernel()
                     loc_coeff = np.concatenate((loc_coeff_occ, loc_coeff_vrt), axis=1)
+                basis = loc_coeff
             elif config.basis == 'canonical':
-                loc_coeff = myhf.mo_coeff
+                basis = mf.mo_coeff
             else:
                 raise ValueError("Unknown basis, please choose between: 'canonical', 'local-boys', 'local-pipek-mezey', 'local-edmiston-ruedenberg' and 'local-split'.")
-            np.save(basis_path, loc_coeff)
-        h1_path = os.path.join(workdir, "h1.npy")
-        h2_path = os.path.join(workdir, "h2.npy")
-        if os.path.exists(h1_path) and os.path.exists(h2_path):
-            h1 = np.load(h1_path)
-            h2 = np.load(h2_path)
-        else:
-            ovlp = myhf.get_ovlp()
+            ovlp = mf.get_ovlp()
             # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
-            assert(np.allclose(np.linalg.multi_dot((loc_coeff.T, ovlp, loc_coeff)),np.eye(norb)))
+            assert(np.allclose(np.linalg.multi_dot((basis.T, ovlp, basis)), np.eye(norb)))
             # Find the hamiltonian the basis
-            h1 = np.linalg.multi_dot((loc_coeff.T, myhf.get_hcore(), loc_coeff))
-            h2 = ao2mo.restore(1, ao2mo.kernel(mol, loc_coeff), norb)
+            h1 = np.linalg.multi_dot((basis.T, mf.get_hcore(), basis))
+            h2 = ao2mo.restore(1, ao2mo.kernel(mol, basis), norb)
+            np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
     else:
