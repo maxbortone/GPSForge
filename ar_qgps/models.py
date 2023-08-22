@@ -139,7 +139,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             gauge_fn=gauge_fn,
             constraint_fn=constraint_fn
         )
-    elif 'Backflow' in name:
+    elif name == 'BackflowCPD':
         if not isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
             raise ValueError("Backflow Ansatz is only implemented for fermionic systems.")
         norb = hilbert.size
@@ -151,10 +151,30 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             config.model.restricted,
             config.model.fixed_magnetization
         )
-        if config.system.get('frozen_electrons', None):
-            phi = get_hf_orbitals_from_file(config.system, workdir, restricted=config.model.restricted, 
-                                                    fixed_magnetization=config.model.fixed_magnetization)
-            def init_fn(key, shape, dtype):
+        if config.model.init_fun =='normal':
+            init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+            orbitals = get_hf_orbitals(
+                config.system,
+                hamiltonian,
+                restricted=config.model.restricted,      
+                fixed_magnetization=config.model.fixed_magnetization
+            )
+        elif config.model.init_fun == 'hf':
+            if config.system.get('frozen_electrons', None):
+                phi = get_hf_orbitals_from_file(
+                    config.system,
+                    workdir,
+                    restricted=config.model.restricted, 
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
+            else:
+                phi = get_hf_orbitals(
+                    config.system,
+                    hamiltonian,
+                    restricted=config.model.restricted,      
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
+            def init_fun(key, shape, dtype):
                 epsilon = jnp.ones(shape, dtype=dtype)
                 epsilon = epsilon.at[:, : total_supp_dim, 0].set(
                     phi.flatten()
@@ -165,15 +185,11 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                 )
                 return epsilon
             orbitals = np.zeros_like(phi)
-        else:
-            init_fn = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
-            orbitals = get_hf_orbitals(config.system, hamiltonian, restricted=config.model.restricted,      
-                                        fixed_magnetization=config.model.fixed_magnetization)
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
             dtype=dtype,
-            init_fun=init_fn,
+            init_fun=init_fun,
             out_transformation=out_trafo,
             apply_fast_update=True
         )
