@@ -63,10 +63,16 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
     if MPIVars.rank == 0:
         fieldnames = ["Component", "Runtime"]
         logger = CSVLogger(os.path.join(workdir, "runtimes.csv"), fieldnames)
-        total_steps = 4 if sr is not None else 3
+        total_steps = 6 if sr is not None else 5
 
     # Benchmark compilation
+    # NOTE: this could in theory be done without evaluating everything twice via
+    # ```
+    # timeit(f.lower(*args).compile())
+    # ```
+    # (see: https://github.com/google/jax/discussions/9716)
     def advance(vs, sr):
+        vs.reset()
         samples = vs.sample()
         samples = samples.reshape((-1, samples.shape[-1]))
         vs.log_value(samples)
@@ -76,49 +82,64 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
         return
 
     if MPIVars.rank == 0:
-        logging.info(f"[0/{total_steps}] Benchmarking compilation...")
+        step = 1
+        logging.info(f"[{step}/{total_steps}] Benchmarking compilation...")
     _, runtime_uncompiled = timeit(advance, vs, sr, repeat=config.repeat)
     _, runtime_compiled = timeit(advance, vs, sr, repeat=config.repeat)
     runtime = runtime_uncompiled - runtime_compiled
     if MPIVars.rank == 0:
-        logger(0, {"Component": "Compilation", "Runtime": runtime})
+        logger(step, {"Component": "Compilation", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark sampling
     vs.reset()
     if MPIVars.rank == 0:
-        logging.info(f"[1/{total_steps}] Benchmarking sampling...")
+        step += 1
+        logging.info(f"[{step}/{total_steps}] Benchmarking sampling...")
     samples, runtime = timeit(vs.sample, repeat=config.repeat)
     samples = samples.reshape((-1, samples.shape[-1]))
     if MPIVars.rank == 0:
-        logger(1, {"Component": "Sampling", "Runtime": runtime})
+        logger(step, {"Component": "Sampling", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark amplitude evaluation
     if MPIVars.rank == 0:
-        logging.info(f"[2/{total_steps}] Benchmarking amplitude evaluation...")
+        step += 1
+        logging.info(f"[{step}/{total_steps}] Benchmarking amplitude evaluation...")
     # samples = jnp.squeeze(samples)
     _, runtime = timeit(vs.log_value, samples, repeat=config.repeat)
     if MPIVars.rank == 0:
-        logger(2, {"Component": "Amplitude", "Runtime": runtime})
+        logger(step, {"Component": "Amplitude", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark energy and gradient evaluation
     if MPIVars.rank == 0:
-        logging.info(f"[3/{total_steps}] Benchmarking energy and gradient evaluation...")
+        step += 1
+        logging.info(f"[{step}/{total_steps}] Benchmarking energy and gradient evaluation...")
     (energy, grad), runtime = timeit(vs.expect_and_grad, ha, repeat=config.repeat)
     if MPIVars.rank == 0:
-        logger(3, {"Component": "Energy", "Runtime": runtime})
+        logger(step, {"Component": "Energy", "Runtime": runtime})
         logging.info(f"Done! This took {runtime} seconds.")
 
     # Benchmark preconditioner evaluation
     if sr is not None:
         if MPIVars.rank == 0:
-            logging.info(f"[4/{total_steps}] Benchmarking preconditioner evaluation...")
+            step += 1
+            logging.info(f"[{step}/{total_steps}] Benchmarking preconditioner evaluation...")
         _, runtime = timeit(sr, vs, grad, 1, repeat=config.repeat)
         if MPIVars.rank == 0:
-            logger(4, {"Component": "Preconditioner", "Runtime": runtime})
+            logger(step, {"Component": "Preconditioner", "Runtime": runtime})
             logging.info(f"Done! This took {runtime} seconds.")
+
+    # Benchmark optimization step
+    vs.reset()
+    if MPIVars.rank == 0:
+        step += 1
+        logging.info(f"[{step}/{total_steps}] Benchmarking optimization step...")
+    _, runtime = timeit(vmc.advance, 1, repeat=config.repeat)
+    if MPIVars.rank == 0:
+        logger(step, {"Component": "Optimization", "Runtime": runtime})
+        logging.info(f"Done! This took {runtime} seconds.")
 
     # Plot to terminal
     df = pd.read_csv(os.path.join(workdir, "runtimes.csv"), header=0, delimiter=",")
