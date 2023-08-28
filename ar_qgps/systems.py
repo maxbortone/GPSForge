@@ -106,12 +106,15 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
         basis_path = os.path.join(workdir, "basis.npy")
         h1_path = os.path.join(workdir, "h1.npy")
         h2_path = os.path.join(workdir, "h2.npy")
+        hf_orbitals_path = os.path.join(workdir, "hf_orbitals.npy")
         if (os.path.exists(basis_path) and
                 os.path.exists(h1_path) and
-                os.path.exists(h2_path)):
+                os.path.exists(h2_path) and
+                os.path.exists(hf_orbitals_path)):
             basis = np.load(basis_path)
             h1 = np.load(h1_path)
             h2 = np.load(h2_path)
+            hf_orbitals = np.load(hf_orbitals_path)
         else:
             # Transform to a local orbital basis if wanted
             if 'local' in config.basis:
@@ -139,11 +142,14 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
             # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
             assert(np.allclose(np.linalg.multi_dot((basis.T, ovlp, basis)), np.eye(norb)))
             # Find the hamiltonian the basis
+            canonical_to_local_trafo = basis.T.dot(ovlp.dot(mf.mo_coeff))
             h1 = np.linalg.multi_dot((basis.T, mf.get_hcore(), basis))
             h2 = ao2mo.restore(1, ao2mo.kernel(mol, basis), norb)
+            hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
             np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
+            np.save(hf_orbitals_path, hf_orbitals)
     else:
         h1 = None
         h2 = None

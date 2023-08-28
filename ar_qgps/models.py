@@ -151,37 +151,24 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             config.model.restricted,
             config.model.fixed_magnetization
         )
+        if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
+            phi = get_hf_orbitals_from_file(
+                config.system,
+                workdir,
+                restricted=config.model.restricted, 
+                fixed_magnetization=config.model.fixed_magnetization
+            )
+        else:
+            phi = get_hf_orbitals(
+                config.system,
+                hamiltonian,
+                restricted=config.model.restricted,      
+                fixed_magnetization=config.model.fixed_magnetization
+            )
         if config.model.init_fun =='normal':
             init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
-            if config.system.get('frozen_electrons', None):
-                orbitals = get_hf_orbitals_from_file(
-                    config.system,
-                    workdir,
-                    restricted=config.model.restricted, 
-                    fixed_magnetization=config.model.fixed_magnetization
-                )
-            else:
-                orbitals = get_hf_orbitals(
-                    config.system,
-                    hamiltonian,
-                    restricted=config.model.restricted,      
-                    fixed_magnetization=config.model.fixed_magnetization
-                )
+            orbitals = phi
         elif config.model.init_fun == 'hf':
-            if config.system.get('frozen_electrons', None):
-                phi = get_hf_orbitals_from_file(
-                    config.system,
-                    workdir,
-                    restricted=config.model.restricted, 
-                    fixed_magnetization=config.model.fixed_magnetization
-                )
-            else:
-                phi = get_hf_orbitals(
-                    config.system,
-                    hamiltonian,
-                    restricted=config.model.restricted,      
-                    fixed_magnetization=config.model.fixed_magnetization
-                )
             def init_fun(key, shape, dtype):
                 epsilon = jnp.ones(shape, dtype=dtype)
                 epsilon = epsilon.at[:, : total_supp_dim, 0].set(
@@ -558,6 +545,8 @@ def setup_mol(config : ConfigDict, hamiltonian : FermiHubbardOnTheFly):
     np.fill_diagonal(h2, hamiltonian.U)
     return mol, h1, h2, norb, n_elec, nelec
 
+# FIXME: this does not work properly for systems with unpaired electrons, i.e. spin != 0,
+# in which case `restricted == True` shouldn't be allowed and `hf_orbitals` should be a tuple
 def get_hf_orbitals_from_file(config: ConfigDict, workdir: str=None, restricted: bool=True, fixed_magnetization: bool=True) -> Array:
     if MPIVars.rank == 0:
         if workdir is None:
