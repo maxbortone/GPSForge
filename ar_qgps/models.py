@@ -154,6 +154,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
             phi = get_hf_orbitals_from_file(
                 config.system,
+                hilbert._n_elec,
                 workdir,
                 restricted=config.model.restricted, 
                 fixed_magnetization=config.model.fixed_magnetization
@@ -545,28 +546,39 @@ def setup_mol(config : ConfigDict, hamiltonian : FermiHubbardOnTheFly):
     np.fill_diagonal(h2, hamiltonian.U)
     return mol, h1, h2, norb, n_elec, nelec
 
-# FIXME: this does not work properly for systems with unpaired electrons, i.e. spin != 0,
-# in which case `restricted == True` shouldn't be allowed and `hf_orbitals` should be a tuple
-def get_hf_orbitals_from_file(config: ConfigDict, workdir: str=None, restricted: bool=True, fixed_magnetization: bool=True) -> Array:
+def get_hf_orbitals_from_file(config: ConfigDict, n_elec: Tuple[int, int], workdir: str=None, restricted: bool=True, fixed_magnetization: bool=True) -> Array:
     if MPIVars.rank == 0:
         if workdir is None:
             workdir = os.getcwd()
         hf_orbitals_path = os.path.join(workdir, 'hf_orbitals.npy')
         if os.path.exists(hf_orbitals_path):
-            hf_orbitals = np.load(hf_orbitals_path) # (norb, nelec//2)
+            hf_orbitals = np.load(hf_orbitals_path) # (norb, nelec//2) or (norb, nelec)
         else:
             raise FileNotFoundError('No HF orbitals found in workdir')
+        nelec = np.sum(n_elec)
         if fixed_magnetization:
             if restricted:
+                assert hf_orbitals.shape[1] == nelec//2
                 orbitals = hf_orbitals
             else:
-                orbitals = np.concatenate([hf_orbitals, hf_orbitals], axis=1)
+                if hf_orbitals.shape[1] == nelec//2:
+                    orbitals = np.concatenate((hf_orbitals, hf_orbitals), axis=1)
+                else:
+                    assert hf_orbitals.shape[1] == nelec
+                    orbitals = hf_orbitals
         else:
             norb = hf_orbitals.shape[0]
-            nelec = hf_orbitals.shape[1]*2
-            orbitals = np.zeros((2*norb, nelec))
-            orbitals[:norb, :nelec//2] = hf_orbitals
-            orbitals[norb:, nelec//2:] = hf_orbitals
+            if config.get('n_elec', None):
+                hf_orbitals_a = hf_orbitals[:, :n_elec[0]]
+                hf_orbitals_b = hf_orbitals[:, :n_elec[1]]
+                orbitals = np.zeros((2*norb, nelec))
+                orbitals[:norb, :n_elec[0]] = hf_orbitals_a
+                orbitals[norb:, n_elec[1]:] = hf_orbitals_b
+            else:
+                nelec = hf_orbitals.shape[1]*2
+                orbitals = np.zeros((2*norb, nelec))
+                orbitals[:norb, :nelec//2] = hf_orbitals
+                orbitals[norb:, nelec//2:] = hf_orbitals
     else:
         orbitals = None
     orbitals = MPIVars.comm.bcast(orbitals, root=0)

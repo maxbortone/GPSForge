@@ -180,6 +180,7 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         frozen_electrons = config.frozen_electrons
         if config.get('n_elec', None):
             n_elec = (config.n_elec[0]-frozen_electrons//2, config.n_elec[1]-frozen_electrons//2)
+            assert n_elec[0] > n_elec[1]
             spin = n_elec[0]-n_elec[1]
         else:
             spin = 0
@@ -192,9 +193,11 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
             spin=spin
         )
         nelec = mol.nelectron-frozen_electrons
-        if config.get('n_elec', None) is None:
+        if spin == 0:
             n_elec = (nelec//2, nelec//2)
-        mf = scf.RHF(mol)
+            mf = scf.RHF(mol)
+        else:
+            mf = scf.ROHF(mol)
         if config.get('sfx2c1e', None):
             mf = scf.sfx2c1e(mf)
         mf.scf()
@@ -268,7 +271,13 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
                     canonical_to_local_trafo,
                     optimize=True,
                 )
-            hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
+            if spin == 0:
+                hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
+            else:
+                hf_orbitals = np.concatenate(
+                    (canonical_to_local_trafo[:, :n_elec[0]], canonical_to_local_trafo[:, :n_elec[1]]),
+                    axis=1
+                )
             np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
