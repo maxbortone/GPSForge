@@ -40,8 +40,9 @@ def main(argv):
     if MPIVars.rank == 0:
         add_file_logger(workdir, basename=config.trainer)
 
-        logging.info(f"JAX process: {jax.process_index()} / {jax.process_count()}")
-        logging.info(f"JAX local devices: {jax.local_devices()}")
+    logging.info(f"JAX local devices: {jax.local_devices()}")
+    if MPIVars.rank == 0:
+        logging.info(f"JAX device count: {MPIVars.n_nodes}")
         jax_xla_backend = ('None' if FLAGS.jax_xla_backend is None else FLAGS.jax_xla_backend)
         logging.info(f"Using JAX XLA backend {jax_xla_backend}")
         logging.info(f"Config: \n{config}")
