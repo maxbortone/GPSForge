@@ -1,5 +1,6 @@
 import os
 import jax
+import subprocess
 from absl import app
 from absl import flags
 from absl import logging
@@ -42,6 +43,10 @@ def main(argv):
 
     logging.info(f"JAX local devices: {jax.local_devices()}")
     if MPIVars.rank == 0:
+        platform = jax.lib.xla_bridge.get_backend().platform
+        if platform == "gpu":
+            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
+            logging.info(f"{result.stdout}")
         logging.info(f"JAX device count: {MPIVars.n_nodes}")
         jax_xla_backend = ('None' if FLAGS.jax_xla_backend is None else FLAGS.jax_xla_backend)
         logging.info(f"Using JAX XLA backend {jax_xla_backend}")
