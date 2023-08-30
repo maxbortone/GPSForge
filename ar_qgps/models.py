@@ -172,10 +172,11 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         elif config.model.init_fun == 'hf':
             def init_fun(key, shape, dtype):
                 epsilon = jnp.ones(shape, dtype=dtype)
-                epsilon = epsilon.at[:, : total_supp_dim, 0].set(
+                first_supp_dim = np.prod(phi.shape)
+                epsilon = epsilon.at[:, : first_supp_dim, 0].set(
                     phi.flatten()
                 )
-                epsilon = epsilon.at[:, total_supp_dim :, 0].set(0.0)
+                epsilon = epsilon.at[:, first_supp_dim :, 0].set(0.0)
                 epsilon += jax.nn.initializers.normal(config.model.sigma, dtype=epsilon.dtype)(
                     key, shape=epsilon.shape, dtype=dtype
                 )
