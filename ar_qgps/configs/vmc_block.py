@@ -35,7 +35,8 @@ def get_config(modules) -> ConfigDict:
     config.variational_state = get_MCState_config(config)
 
     # Optimizer
-    config.optimizer_name = "BlockSRRMSProp"
+    config.optimizer_name = "SRRMSProp"
     config.optimizer = get_SRRMSProp_config()
+    config.optimizer.n_blocks = 2
 
     return config.lock()
