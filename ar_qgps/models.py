@@ -182,6 +182,20 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                 )
                 return epsilon
             orbitals = np.zeros_like(phi)
+        elif config.model.init_fun == 'hf-dist':
+            def init_fun(key, shape, dtype):
+                phi_init = phi.flatten()
+                phi_init = phi_init / config.model.M
+                phi_init = np.tile(phi_init, config.model.M)
+                epsilon = jnp.ones(shape, dtype=dtype)
+                epsilon = epsilon.at[:, :, 0].set(
+                    phi_init
+                )
+                epsilon += jax.nn.initializers.normal(config.model.sigma, dtype=epsilon.dtype)(
+                    key, shape=epsilon.shape, dtype=dtype
+                )
+                return epsilon
+            orbitals = np.zeros_like(phi)
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
