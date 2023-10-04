@@ -47,14 +47,17 @@ def get_init_fun_block(vstate: nk.vqs.MCState, block_size: int) -> Callable:
 
 def get_update_block_fun(vstate: nk.vqs.MCState, vstate_block: nk.vqs.MCState, qgt: qk.optimizer.qgt.QGTJacobianDenseRMSProp, solver: Callable, config: ml_collections.ConfigDict) -> Callable:
     _, unravel_fun = nk.jax.tree_ravel(vstate.parameters.unfreeze())
-    def update_block(model_params, samples, idx, g, e):
-        block = jnp.take(model_params, idx)
+    def update_block(carry, x):
+        dp, model_params, samples = carry
+        idx_block, grad_block, ema_block = x
+        block = jnp.take(model_params, idx_block)
         vstate_block.parameters = {'block': block}
-        vstate_block.model_state = {'cache': {'idx_block': idx, 'model_params': unravel_fun(model_params)}, **vstate.model_state}
+        vstate_block.model_state = {'cache': {'idx_block': idx_block, 'model_params': unravel_fun(model_params)}, **vstate.model_state}
         vstate_block._samples = samples
-        lhs = qgt(vstate_block, e, diag_shift=config.optimizer.diag_shift, eps=config.optimizer.eps, mode=config.optimizer.mode)
-        dp_block, _ = lhs.solve(solver, g)
-        return dp_block
+        lhs = qgt(vstate_block, ema_block, diag_shift=config.optimizer.diag_shift, eps=config.optimizer.eps, mode=config.optimizer.mode)
+        dp_block, _ = lhs.solve(solver, grad_block)
+        dp = dp.at[idx_block].set(dp_block)
+        return (dp, model_params, samples), None
     return update_block
 
 def get_idx_blocks(ema: Array, n_blocks: int):
@@ -93,6 +96,7 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
 
     # Variational state
     vs = nk.vqs.MCState(sa, ma, **config.variational_state)
+    vs.n_samples = config.variational_state.n_samples * config.optimizer.n_samples_multiplier
 
     # Block variational state
     assert vs.n_parameters % config.optimizer.n_blocks == 0
@@ -104,7 +108,6 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
     ema = jnp.zeros(nk.jax.tree_size(vs.parameters))
     update_ema = get_update_ema_fun(config)
     update_block = get_update_block_fun(vs, vs_block, qgt, solver, config)
-    update_blocks = jax.jit(jax.vmap(update_block, in_axes=(None, None, 0, 0, 0)))
 
     # Logger
     if MPIVars.rank == 0:
@@ -123,11 +126,11 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
     total_steps = config.total_steps
     for step in range(initial_step, total_steps + 1):
         # Sample configurations
-        # TODO: sample a lot of configurations to improve the estimation of the S matrix,
-        # but only use a fraction of those to estimate the energies, since that cost scales quarticly
         samples = vs.sample()
+        samples_en = samples[:, ::config.optimizer.n_samples_multiplier, :]
 
         # Compute energy and gradient
+        vs._samples = samples_en
         energy, grad = vs.expect_and_grad(ha)
         grad, unravel_fun = nk.jax.tree_ravel(grad)
 
@@ -139,17 +142,10 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
         grad_blocks = jax.vmap(lambda idx: jnp.take(grad, idx))(idx_blocks)
         ema_blocks = jax.vmap(lambda idx: jnp.take(ema, idx))(idx_blocks)
 
-        # Vmap over blocks
+        # Update block parameters
         model_params, _ = nk.jax.tree_ravel(vs.parameters.unfreeze())
-        dp_blocks = update_blocks(model_params, samples, idx_blocks, grad_blocks, ema_blocks)
-        
-        # Combine block updates
-        def combine_blocks(dp, x):
-            idx_block, dp_block = x
-            dp = dp.at[idx_block].set(dp_block)
-            return dp, None
         dp = jnp.zeros_like(grad)
-        dp, _ = jax.lax.scan(combine_blocks, dp, (idx_blocks, dp_blocks))
+        (dp, _, _), _ = jax.lax.scan(update_block, (dp, model_params, samples), (idx_blocks, grad_blocks, ema_blocks))
 
         # Update parameters
         model_params = model_params - config.optimizer.learning_rate * dp

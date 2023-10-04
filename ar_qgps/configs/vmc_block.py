@@ -38,5 +38,6 @@ def get_config(modules) -> ConfigDict:
     config.optimizer_name = "SRRMSProp"
     config.optimizer = get_SRRMSProp_config()
     config.optimizer.n_blocks = 2
+    config.optimizer.n_samples_multiplier = 1
 
     return config.lock()
