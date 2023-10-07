@@ -1,4 +1,5 @@
 from ml_collections import ConfigDict
+from ml_collections.config_dict import placeholder
 from ar_qgps.configs import common
 from ar_qgps.configs import systems
 from ar_qgps.configs import models
@@ -39,5 +40,16 @@ def get_config(modules) -> ConfigDict:
     get_optimizer_config = getattr(optimizers, f"get_{optimizer}_config")
     config.optimizer_name = optimizer
     config.optimizer = get_optimizer_config()
+
+    # Descent finishing
+    config.descent_finishing = ConfigDict()
+    config.descent_finishing.total_steps = 50
+    config.descent_finishing.learning_rate = 0.001
+
+    # Evaluation configs
+    config.evaluate = ConfigDict()
+    config.evaluate.total_steps = 10
+    config.evaluate.n_samples = 10*config.variational_state.get_ref('n_samples')
+    config.evaluate.chunk_size = placeholder(int)
 
     return config.lock()
