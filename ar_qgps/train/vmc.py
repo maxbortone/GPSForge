@@ -4,6 +4,7 @@ import flax
 import ml_collections
 import numpy as np
 import netket as nk
+import netket.experimental as nkx
 import GPSKet as qk
 import jax.numpy as jnp
 from absl import logging
@@ -56,6 +57,12 @@ serialization.register_serialization_state(
     deserialize_VMC
 )
 
+serialization.register_serialization_state(
+    nkx.driver.VMC_SRt,
+    serialize_VMC,
+    deserialize_VMC
+)
+
 def vmc(config: ml_collections.ConfigDict, workdir: str):
     """Trains an Ansatz on a system using VMC."""
 
@@ -80,6 +87,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     if config.optimizer_name == 'minSR':
         solver = lambda A, b: jnp.linalg.lstsq(A, b, rcond=config.optimizer.rcond)[0]
         vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
+    elif config.optimizer_name == 'kernelSR':
+        vmc = nkx.driver.VMC_SRt(ha, op, variational_state=vs, jacobian_mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift)
     else:
         vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
@@ -131,8 +140,11 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
 
             # Report training metrics
             if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
-                grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
-                grad_norm = np.linalg.norm(grad)
+                if hasattr(vmc, "_loss_grad"):
+                    grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
+                    grad_norm = np.linalg.norm(grad)
+                else:
+                    grad_norm = np.nan
                 done = step / config.total_steps
                 logging.info(f"Step: {step}/{config.total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
                             f"E: {vmc.energy}, "
@@ -185,8 +197,11 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
 
             # Report training metrics
             if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
-                grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
-                grad_norm = np.linalg.norm(grad)
+                if hasattr(vmc, "_loss_grad"):
+                    grad, _ = nk.jax.tree_ravel(vmc._loss_grad)
+                    grad_norm = np.linalg.norm(grad)
+                else:
+                    grad_norm = np.nan
                 done = step / total_steps
                 logging.info(f"Step: {step}/{total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
                             f"E: {vmc.energy}, "

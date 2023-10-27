@@ -45,3 +45,10 @@ def get_minSR_config() -> ConfigDict:
     config.mode = 'real'
     config.rcond = 1e-12
     return config
+
+def get_kernelSR_config() -> ConfigDict:
+    config = ConfigDict()
+    config.learning_rate = 0.01
+    config.mode = 'real'
+    config.diag_shift = 1e-4
+    return config

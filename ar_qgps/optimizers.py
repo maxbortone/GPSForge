@@ -46,7 +46,7 @@ def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalS
     Returns:
         the optimizer with preconditioner, if specified
     """
-    if config.optimizer_name == 'Sgd' or config.optimizer_name == 'minSR':
+    if config.optimizer_name in ['Sgd', 'minSR', 'kernelSR']:
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         sr = None
     elif config.optimizer_name == 'Adam':
