@@ -4,7 +4,12 @@ import flax
 import ml_collections
 import numpy as np
 import netket as nk
-import netket.experimental as nkx
+# FIXME: wrap this in a try/except so that it works with the current release
+try:
+    from netket.experimental.driver import VMC_SRt
+    KERNELSR_AVAIL = True
+except:
+    KERNELSR_AVAIL = False
 import GPSKet as qk
 import jax.numpy as jnp
 from absl import logging
@@ -57,11 +62,12 @@ serialization.register_serialization_state(
     deserialize_VMC
 )
 
-serialization.register_serialization_state(
-    nkx.driver.VMC_SRt,
-    serialize_VMC,
-    deserialize_VMC
-)
+if KERNELSR_AVAIL:
+    serialization.register_serialization_state(
+        VMC_SRt,
+        serialize_VMC,
+        deserialize_VMC
+    )
 
 def vmc(config: ml_collections.ConfigDict, workdir: str):
     """Trains an Ansatz on a system using VMC."""
@@ -88,7 +94,10 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         solver = lambda A, b: jnp.linalg.lstsq(A, b, rcond=config.optimizer.rcond)[0]
         vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
     elif config.optimizer_name == 'kernelSR':
-        vmc = nkx.driver.VMC_SRt(ha, op, variational_state=vs, jacobian_mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift)
+        if KERNELSR_AVAIL:
+            vmc = VMC_SRt(ha, op, variational_state=vs, jacobian_mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift)
+        else:
+            raise ValueError("kernelSR is not available, update to latest development version of NetKet.")
     else:
         vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
