@@ -167,7 +167,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
                 logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")
 
     # Descent finishing
-    if config.get('descent_finishing', None):
+    if config.get('descent_finishing', None) and initial_step < config.total_steps + config.descent_finishing.total_steps:
         # Switch to first SGD optimizer
         op = nk.optimizer.Sgd(learning_rate=config.descent_finishing.learning_rate)
         vmc.optimizer = op
