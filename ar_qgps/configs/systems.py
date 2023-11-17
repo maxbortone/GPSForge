@@ -35,6 +35,7 @@ def diatomic(config):
 
 def get_Cr_config() -> ConfigDict:
     config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
     config.molecule_name = 'Cr'
     config.molecule = [('Cr', (0., 0., 0.))]
     config.basis_set = 'cc-pvdz-dk'
@@ -48,6 +49,7 @@ def get_Cr_config() -> ConfigDict:
 
 def get_Cr2_config() -> ConfigDict:
     config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
     config.molecule_name = 'Cr2'
     config.bond_length = 1.68
     config.bond_length_multiple = 1.0
@@ -94,6 +96,7 @@ def get_J1J22d_config() -> ConfigDict:
 
 def get_Hchain_config() -> ConfigDict:
     config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
     config.n_atoms = 16
     config.distance = 1.8
     config.basis_set = 'sto-6g'
@@ -107,6 +110,7 @@ def get_Hchain_config() -> ConfigDict:
 
 def get_Hsheet_config() -> ConfigDict:
     config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
     config.n_atoms = 16
     config.distance = 1.8
     config.basis_set = 'sto-6g'
@@ -120,6 +124,7 @@ def get_Hsheet_config() -> ConfigDict:
 
 def get_H2O_config() -> ConfigDict:
     config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
     config.molecule = [('H', (0., 0.795, -0.454)), ('H', (0., -0.795, -0.454)), ('O', (0., 0., 0.113))]
     config.basis_set = '6-31g'
     config.basis = 'canonical'

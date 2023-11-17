@@ -2,9 +2,10 @@ import os
 import numpy as np
 import netket as nk
 import GPSKet as qk
+from typing import Union
 from ml_collections import ConfigDict
 from netket.operator import AbstractOperator, Heisenberg
-from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly
+from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse
 from GPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
 from pyscf.mcscf.casci import CASCI
@@ -59,7 +60,7 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, total_sz=config.total_sz, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
-def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHamiltonianOnTheFly:
+def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]:
     """
     Return the Hamiltonian for a molecular system
 
@@ -141,11 +142,15 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
             ovlp = mf.get_ovlp()
             # Check that we still have an orthonormal basis, i.e. C^T S C should be the identity
             assert(np.allclose(np.linalg.multi_dot((basis.T, ovlp, basis)), np.eye(norb)))
-            # Find the hamiltonian the basis
+            # Find the hamiltonian in the basis
             canonical_to_local_trafo = basis.T.dot(ovlp.dot(mf.mo_coeff))
             h1 = np.linalg.multi_dot((basis.T, mf.get_hcore(), basis))
             h2 = ao2mo.restore(1, ao2mo.kernel(mol, basis), norb)
             hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
+            # Prune Hamiltonian elements below threshold
+            if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
+                h1[abs(h1) < config.pruning_threshold] = 0.0
+                h2[abs(h2) < config.pruning_threshold] = 0.0
             np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
@@ -157,7 +162,10 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHam
     h2 = MPIVars.comm.bcast(h2, root=0)
 
     # Setup Hamiltonian
-    ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
+    if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
+        ha = AbInitioHamiltonianSparse(hi, h1, h2)
+    else:
+        ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
     return ha
 
 def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHamiltonianOnTheFly:
