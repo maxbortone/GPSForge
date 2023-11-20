@@ -218,7 +218,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
     if config.get('evaluate', None):
         # Restore model
         best = restore_best_params(workdir)
-        vs.parameters = best['Parameters']
+        if best is not None:
+            vs.parameters = best['Parameters']
 
         # Update variational state settings
         vs.n_samples = config.evaluate.n_samples
