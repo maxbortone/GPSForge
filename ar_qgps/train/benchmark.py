@@ -83,21 +83,12 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
     # timeit(f.lower(*args).compile())
     # ```
     # (see: https://github.com/google/jax/discussions/9716)
-    def advance(vs, sr):
-        vs.reset()
-        samples = vs.sample()
-        samples = samples.reshape((-1, samples.shape[-1]))
-        vs.log_value(samples)
-        energy, grad = vs.expect_and_grad(ha)
-        if sr is not None:
-            sr(vs, grad, 1)
-        return
 
     if MPIVars.rank == 0:
         step = 1
         logging.info(f"[{step}/{total_steps}] Benchmarking compilation...")
-    _, runtime_uncompiled, error_uncompiled = timeit(advance, vs, sr, repeat=config.repeat)
-    _, runtime_compiled, error_compiled = timeit(advance, vs, sr, repeat=config.repeat)
+    _, runtime_uncompiled, error_uncompiled = timeit(vmc.advance, 1)
+    _, runtime_compiled, error_compiled = timeit(vmc.advance, 1)
     runtime = runtime_uncompiled - runtime_compiled
     error = np.max([error_uncompiled, error_compiled])
     if MPIVars.rank == 0:
