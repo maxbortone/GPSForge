@@ -153,5 +153,6 @@ def get_Hubbard2d_config() -> ConfigDict:
 def get_config(system) -> ConfigDict:
     get_system_config = getattr(sys.modules[__name__], f"get_{system}_config")
     config = ConfigDict()
+    config.system_name = system
     config.system = get_system_config()
     return config
