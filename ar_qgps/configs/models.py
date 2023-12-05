@@ -21,6 +21,14 @@ def get_ARqGPS_config() -> ConfigDict:
 get_ARqGPSFull_config = get_ARqGPS_config
 get_ARPlaquetteqGPS_config = get_ARqGPS_config
 
+def get_SegGPS_config() -> ConfigDict:
+    config = ConfigDict()
+    # Parse support dimension later, allow int as well as tuples
+    config.M = '1'
+    config.dtype = 'real'
+    config.sigma = 0.1
+    return config
+
 def get_PixelCNN_config() -> ConfigDict:
     config = ConfigDict()
     config.dtype = 'real'

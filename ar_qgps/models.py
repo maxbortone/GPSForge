@@ -24,6 +24,7 @@ Hamiltonian = Union[AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly]
 _MODELS = {
     'qGPS': qk.models.qGPS,
     'PlaquetteqGPS': qk.models.qGPS,
+    'SegGPS': qk.models.SegGPS,
     'ARqGPS': qk.models.ARqGPS,
     'ARqGPSFull': qk.models.ARqGPSFull,
     'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS,
@@ -54,7 +55,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         dtype = jnp.float64
     elif config.model.dtype == 'complex':
         dtype = jnp.complex128
-    if 'GPS'  in name:
+    if name != 'SegGPS' and 'GPS'  in name:
         if isinstance(config.model.M, tuple):
             assert len(config.model.M) == hilbert.size
             M = HashableArray(np.array(config.M))
@@ -110,6 +111,15 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                 syms=(symmetries_fn, inv_symmetries_fn),
                 out_transformation=out_trafo,
                 apply_fast_update=True)
+    elif name == 'SegGPS':
+        M = int(config.model.M)
+        init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+        ma = ma_cls(
+            hilbert,
+            M,
+            dtype=dtype,
+            init_fun=init_fun
+        )
     elif 'PixelCNN' in name:
         if config.system.get('Ly', None) is None:
             raise ValueError("PixelCNN Ansatz is only implemented for 2D systems.")
