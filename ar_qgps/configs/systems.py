@@ -70,7 +70,7 @@ def get_Heisenberg1d_config() -> ConfigDict:
     config.J1 = 1.0
     config.pbc = True
     config.sign_rule = True
-    config.total_sz = 0
+    config.total_sz = 0.0
     return config
 
 def get_Heisenberg2d_config() -> ConfigDict:
@@ -80,7 +80,7 @@ def get_Heisenberg2d_config() -> ConfigDict:
     config.J1 = 1.0
     config.pbc = True
     config.sign_rule = True
-    config.total_sz = 0
+    config.total_sz = 0.0
     return config
 
 def get_J1J22d_config() -> ConfigDict:
