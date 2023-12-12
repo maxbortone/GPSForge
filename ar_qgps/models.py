@@ -332,16 +332,16 @@ def get_symmetry_transformation_spin(name : str, translations : bool, point_symm
 
 def count_spins(spins : Array) -> Array:
     """
-    Count the number of up- and down-spins in a batch of local configurations x_i,
+    Count the number of down- and up-spins in a batch of local configurations x_i,
     where x_i can be equal to:
-        - 0 if it is occupied by an up-spin
-        - 1 if it is occupied by a down-spin
+        - 0 if it is occupied by an down-spin
+        - 1 if it is occupied by a up-spin
 
     Args:
         spins : array of local configurations (batch,)
 
     Returns:
-        the number of up- and down-spins for each configuration in the batch (batch, 2)
+        the number of down- and up-spins for each configuration in the batch (batch, 2)
     """
     # TODO: extend to cases beyond D=2
     return jnp.stack([(spins+1)&1, ((spins+1)&2)/2], axis=-1).astype(jnp.int32)
