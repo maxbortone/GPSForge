@@ -33,6 +33,21 @@ def diatomic(config):
     ]
     return config
 
+def get_N2_config() -> ConfigDict:
+    config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
+    config.molecule_name = 'N2'
+    config.bond_length = 2.068
+    config.bond_length_multiple = 1.0
+    config.molecule = placeholder(list)
+    config.basis_set = 'aug-cc-pcvdz'
+    config.basis = 'canonical'
+    config.symmetry=True
+    config.unit = 'Bohr'
+    with config.ignore_type():
+        config.set_molecule = diatomic
+    return config
+
 def get_Cr_config() -> ConfigDict:
     config = ConfigDict()
     config.pruning_threshold = placeholder(float)
