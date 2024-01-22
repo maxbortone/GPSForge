@@ -17,6 +17,7 @@ from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, FermiHubbar
 from VMCutils import MPIVars
 from plum import dispatch
 from typing import Union, Tuple, Callable, Optional
+from ar_qgps.systems import build_molecule
 
 
 Hamiltonian = Union[AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly]
@@ -30,6 +31,7 @@ _MODELS = {
     'ARPlaquetteqGPS': qk.models.ARPlaquetteqGPS,
     'PixelCNN': qk.models.PixelCNN,
     'BackflowCPD': qk.models.Backflow,
+    'CPDBackflow': qk.models.CPDBackflow,
 }
 
 def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None, hamiltonian : Hamiltonian = None, workdir: str=None) -> nn.Module:
@@ -221,6 +223,58 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             spin_symmetry_by_structure=config.model.restricted,
             fixed_magnetization=config.model.fixed_magnetization,
             apply_fast_update=True
+        )
+    elif name == 'CPDBackflow':
+        if not isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
+            raise ValueError("CPD backflow Ansatz is only implemented for fermionic systems.")
+        if config.model.get("range_cutoff", None):
+            if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
+                environments = get_top_k_orbital_indices(
+                    config.system,
+                    config.model.range_cutoff,
+                    workdir
+                )
+                environments = HashableArray(environments)
+            else:
+                raise ValueError("Range cutoff is currently only supported for molecular systems.")
+        else:
+            environments = None
+        if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
+            phi = get_hf_orbitals_from_file(
+                config.system,
+                hilbert._n_elec,
+                workdir,
+                restricted=config.model.restricted, 
+                fixed_magnetization=config.model.fixed_magnetization
+            )
+        else:
+            phi = get_hf_orbitals(
+                config.system,
+                hamiltonian,
+                restricted=config.model.restricted,      
+                fixed_magnetization=config.model.fixed_magnetization
+            )
+        if config.model.init_fun =='normal':
+            init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+        elif config.model.init_fun == 'hf':
+            def init_fun(key, shape, dtype):
+                epsilon = jnp.ones(shape, dtype=dtype)
+                epsilon = epsilon.at[:, :, :, 0, 0].set(
+                    jnp.expand_dims(phi, axis=-1)
+                )
+                epsilon = epsilon.at[:, :, :, 1:, 0].set(0.0)
+                epsilon += jax.nn.initializers.normal(config.model.sigma, dtype=epsilon.dtype)(
+                    key, shape=epsilon.shape, dtype=dtype
+                )
+                return epsilon
+        ma = ma_cls(
+            hilbert,
+            config.model.M,
+            environments=environments,
+            dtype=dtype,
+            init_fun=init_fun,
+            restricted=config.model.restricted,
+            fixed_magnetization=config.model.fixed_magnetization
         )
     return ma
 
@@ -640,3 +694,42 @@ def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: b
         out = jnp.sum(x, axis=1)
         return out
     return out_trafo, np.prod(shape)
+
+def get_top_k_orbital_indices(config: ConfigDict, range_cutoff: int, workdir: str=None) -> Array:
+    if MPIVars.rank == 0:
+        # Setup molecule
+        mol = build_molecule(config)
+
+        # Load mean-field
+        spin = mol.spin
+        if spin == 0:
+            mf = scf.RHF(mol)
+        else:
+            mf = scf.ROHF(mol)
+        if config.get('sfx2c1e', None):
+            mf = scf.sfx2c1e(mf)
+        mf.run()
+
+        # Get converged density matrix from the Hartree Fock
+        dm = mf.make_rdm1()
+
+        # Get exchange matrix
+        _, vk = mf.get_jk(mol, dm)
+
+        # Transform to a local orbital basis, if necessary
+        if 'local' in config.basis:
+            if workdir is None:
+                workdir = os.getcwd()
+            basis_path = os.path.join(workdir, 'basis.npy')
+            if os.path.exists(basis_path):
+                basis = np.load(basis_path) # (norb, norb)
+            else:
+                raise FileNotFoundError('No basis file found in workdir')
+            vk = np.linalg.multi_dot((basis.T, vk, basis))
+
+        # Generate environment matrix of top-K closest coupled orbitals for each orbital
+        top_k_orbital_indices = np.argsort(vk, axis=1)[:, :range_cutoff]
+    else:
+        top_k_orbital_indices = None
+    top_k_orbital_indices = MPIVars.comm.bcast(top_k_orbital_indices, root=0)
+    return top_k_orbital_indices

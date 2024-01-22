@@ -47,3 +47,15 @@ def get_BackflowCPD_config() -> ConfigDict:
     config.restricted = False
     config.fixed_magnetization = True
     return config
+
+get_CPDBackflow_config = get_BackflowCPD_config
+def get_CPDBackflow_config() -> ConfigDict:
+    config = ConfigDict()
+    config.M = '1'
+    config.dtype = 'real'
+    config.init_fun = 'hf'
+    config.sigma = 0.01
+    config.restricted = False
+    config.fixed_magnetization = True
+    config.range_cutoff = 4
+    return config

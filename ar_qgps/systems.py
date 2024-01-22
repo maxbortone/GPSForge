@@ -9,6 +9,7 @@ from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, AbInitioHam
 from GPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
 from pyscf.mcscf.casci import CASCI
+from pyscf.gto.basis import BasisNotFoundError
 from VMCutils import MPIVars
 
 
@@ -26,7 +27,7 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2', 'Cr']:
+    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2', 'Cr', 'N2']:
         if config.system.get('frozen_electrons', None) is not None:
             return get_frozen_core_molecular_system(config.system, workdir=workdir)
         else:
@@ -60,6 +61,47 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, total_sz=config.total_sz, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
+def build_molecule(config : ConfigDict):
+    if config.get('atom', None):
+        atom = config.atom
+    else:
+        atom = config.molecule
+    frozen_electrons = config.get('frozen_electrons', 0)
+    if config.get('n_elec', None):
+        # TODO: frozen core assumes a diatomic molecule of same atoms (e.g. Cr2); generalize this
+        n_elec = (config.n_elec[0]-frozen_electrons//2, config.n_elec[1]-frozen_electrons//2)
+        # TODO: verify if this assertion is necessary
+        assert n_elec[0] > n_elec[1]
+        spin = n_elec[0]-n_elec[1]
+    else:
+        spin = 0
+    try:
+        mol = gto.M(
+            atom=atom,
+            basis=config.basis_set,
+            symmetry=config.symmetry,
+            unit=config.unit,
+            spin=spin
+        )
+    except (BasisNotFoundError, TypeError) as e:
+        # If the basis set specified is not packaged with PySCF and the Basis Set Exchange (BSE) API pip package is not installed,
+        # then a BasisNotFoundError will be raised.
+        # If the BSE package is installed, PySCF will try to download the basis set file from it. However, this is very poorly
+        # supported in PySCF, so that often the basis set file will not be parsed properly. The code below is a workaround.
+        from pyscf.gto.basis import bse
+
+        elements = set([a[0] for a in atom])
+        basis_obj = bse.basis_set_exchange.api.get_basis(config.basis_set, elements=list(elements), fmt='nwchem')
+        basis = gto.basis.parse(basis_obj)
+        mol = gto.M(
+            atom=atom,
+            basis=basis,
+            symmetry=config.symmetry,
+            unit=config.unit,
+            spin=spin
+        )
+    return mol
+
 def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]:
     """
     Return the Hamiltonian for a molecular system
@@ -72,32 +114,30 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbIni
         Hamiltonian for the molecular system
     """
     # Setup Hilbert space
-    if config.get('atom', None):
-        atom = config.atom
-    else:
-        atom = config.molecule
     if MPIVars.rank == 0:
-        mol = gto.Mole()
-        mol.build(
-            atom=atom,
-            basis=config.basis_set,
-            symmetry=config.symmetry,
-            unit=config.unit
-        )
-        nelec = mol.nelectron
-        print('Number of electrons: ', nelec)
-
-        mf = scf.RHF(mol)
+        mol = build_molecule(config)
+        spin = mol.spin
+        n_elec = mol.nelec
+        nelec = np.sum(n_elec)
+        if spin == 0:
+            mf = scf.RHF(mol)
+        else:
+            mf = scf.ROHF(mol)
+        if config.get('sfx2c1e', None):
+            mf = scf.sfx2c1e(mf)
         mf.scf()
         norb = mf.mo_coeff.shape[1]
-        print('Number of molecular orbitals: ', norb)
+        print(f"Number of molecular orbitals: {norb}")
+        print(f"Number of α and β electrons: {n_elec}")
     else:
         norb = None
+        n_elec = None
         nelec = None
-    norb = MPIVars.comm.bcast(norb, root=0)
-    nelec = MPIVars.comm.bcast(nelec, root=0)
+    norb = MPIVars.comm.bcast(norb, root=0) # Number of molecular orbitals
+    n_elec = MPIVars.comm.bcast(n_elec, root=0) # Number of α and β electrons
+    nelec = MPIVars.comm.bcast(nelec, root=0) # Total number of electrons
 
-    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=(nelec//2,nelec//2))
+    hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=n_elec)
 
     # Get hamiltonian elements
     if MPIVars.rank == 0:
@@ -146,7 +186,13 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbIni
             canonical_to_local_trafo = basis.T.dot(ovlp.dot(mf.mo_coeff))
             h1 = np.linalg.multi_dot((basis.T, mf.get_hcore(), basis))
             h2 = ao2mo.restore(1, ao2mo.kernel(mol, basis), norb)
-            hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
+            if spin == 0:
+                hf_orbitals = canonical_to_local_trafo[:, :nelec//2]
+            else:
+                hf_orbitals = np.concatenate(
+                    (canonical_to_local_trafo[:, :n_elec[0]], canonical_to_local_trafo[:, :n_elec[1]]),
+                    axis=1
+                )
             # Prune Hamiltonian elements below threshold
             if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
                 h1[abs(h1) < config.pruning_threshold] = 0.0
@@ -168,7 +214,7 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbIni
         ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
     return ha
 
-def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) -> AbInitioHamiltonianOnTheFly:
+def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]:
     """
     Return the Hamiltonian for a molecular system with a frozen core
 
@@ -180,29 +226,14 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         Hamiltonian for the molecular system
     """
     # Setup Hilbert space
-    if config.get('atom', None):
-        atom = config.atom
-    else:
-        atom = config.molecule
     if MPIVars.rank == 0:
+        # TODO: frozen core assumes a diatomic molecule of same atoms (e.g. Cr2); generalize this
         frozen_electrons = config.frozen_electrons
-        if config.get('n_elec', None):
-            n_elec = (config.n_elec[0]-frozen_electrons//2, config.n_elec[1]-frozen_electrons//2)
-            assert n_elec[0] > n_elec[1]
-            spin = n_elec[0]-n_elec[1]
-        else:
-            spin = 0
-        mol = gto.Mole()
-        mol.build(
-            atom=atom,
-            basis=config.basis_set,
-            symmetry=config.symmetry,
-            unit=config.unit,
-            spin=spin
-        )
-        nelec = mol.nelectron-frozen_electrons
+        mol = build_molecule(config)
+        spin = mol.spin
+        n_elec = tuple(np.array(mol.nelec)-frozen_electrons//2)
+        nelec = np.sum(n_elec)
         if spin == 0:
-            n_elec = (nelec//2, nelec//2)
             mf = scf.RHF(mol)
         else:
             mf = scf.ROHF(mol)
@@ -286,6 +317,10 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
                     (canonical_to_local_trafo[:, :n_elec[0]], canonical_to_local_trafo[:, :n_elec[1]]),
                     axis=1
                 )
+            # Prune Hamiltonian elements below threshold
+            if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
+                h1[abs(h1) < config.pruning_threshold] = 0.0
+                h2[abs(h2) < config.pruning_threshold] = 0.0
             np.save(basis_path, basis)
             np.save(h1_path, h1)
             np.save(h2_path, h2)
@@ -298,7 +333,10 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
     h2 = MPIVars.comm.bcast(h2, root=0)
 
     # Setup Hamiltonian
-    ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
+    if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
+        ha = AbInitioHamiltonianSparse(hi, h1, h2)
+    else:
+        ha = AbInitioHamiltonianOnTheFly(hi, h1, h2)
     return ha
 
 def get_Hubbard_system(config: ConfigDict, return_graph: bool=False) -> FermiHubbardOnTheFly:
