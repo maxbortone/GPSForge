@@ -1,4 +1,5 @@
 from ml_collections import ConfigDict
+from ml_collections.config_dict import placeholder
 
 
 def get_qGPS_config() -> ConfigDict:
@@ -57,5 +58,5 @@ def get_CPDBackflow_config() -> ConfigDict:
     config.sigma = 0.01
     config.restricted = False
     config.fixed_magnetization = True
-    config.range_cutoff = 4
+    config.range_cutoff = placeholder(int)
     return config
