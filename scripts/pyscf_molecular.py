@@ -5,8 +5,7 @@ sys.path.append(os.path.join(base_path, "../"))
 from absl import app
 from absl import flags
 from absl import logging
-from pyscf import gto, scf, cc, fci
-from pyscf.gto.basis import BasisNotFoundError
+from pyscf import scf, cc, fci
 from ml_collections import config_flags
 from ar_qgps.configs.common import resolve
 from ar_qgps.systems import build_molecule, get_molecular_system
