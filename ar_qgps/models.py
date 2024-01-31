@@ -728,7 +728,7 @@ def get_top_k_orbital_indices(config: ConfigDict, range_cutoff: int, workdir: st
             vk = np.linalg.multi_dot((basis.T, vk, basis))
 
         # Generate environment matrix of top-K closest coupled orbitals for each orbital
-        top_k_orbital_indices = np.argsort(np.abs(vk), axis=1)[:, -range_cutoff:]
+        top_k_orbital_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -range_cutoff:], axis=1)
     else:
         top_k_orbital_indices = None
     top_k_orbital_indices = MPIVars.comm.bcast(top_k_orbital_indices, root=0)
