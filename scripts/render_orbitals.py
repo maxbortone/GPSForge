@@ -69,12 +69,10 @@ def main(argv):
         vk = np.linalg.multi_dot((basis.T, vk, basis))
 
     # Generate environment matrix of top-K closest coupled orbitals for each orbital
-    K = K.value
-    top_k_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -K:], axis=1)
+    top_k_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -K.value:], axis=1)
 
     # Choose orbital
-    orbital_idx = orbital_idx.value
-    orbital = np.sum(basis[:, top_k_indices[orbital_idx]], axis=1)
+    orbital = np.sum(basis[:, top_k_indices[orbital_idx.value]], axis=1)
 
     # Set options
     options = dict(
