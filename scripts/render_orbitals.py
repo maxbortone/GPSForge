@@ -17,7 +17,7 @@ from pyscf2vmd import Plotter, CubeFile
 
 FLAGS = flags.FLAGS
 
-orbital_idx = flags.DEFINE_integer('orbital_idx', 14, 'Index of the orbital to plot')
+orbitals = flags.DEFINE_list('orbitals', [14], 'Indices of the orbitals to plot')
 K = flags.DEFINE_integer('K', 5, 'Number of closest coupled orbitals')
 output_file = flags.DEFINE_string('output_file', 'output', 'Output file name')
 rotate = flags.DEFINE_list('rotate', [-45.0, 0.0, 0.0], 'Rotation angles for VMD')
@@ -71,25 +71,27 @@ def main(argv):
     # Generate environment matrix of top-K closest coupled orbitals for each orbital
     top_k_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -K.value:], axis=1)
 
-    # Choose orbital
-    orbital = np.sum(basis[:, top_k_indices[orbital_idx.value]], axis=1)
+    orbital_indices = np.array(orbitals.value, np.int32)
+    for orbital_index in orbital_indices:
+        # Choose orbital
+        orbital = np.sum(basis[:, top_k_indices[orbital_index]], axis=1)
 
-    # Set options
-    options = dict(
-        render_res=(1920, 1080),
-        convert_to_png=True,
-        isovalue=isovalue.value,
-        rotate=rotate.value,
-        keep_vmd_input=True,
-        tachyon_path="/users/k20122214/.conda/envs/pyscf-vmd/lib/tachyon_LINUXAMD64",
-        vmd_path="/users/k20122214/.conda/envs/pyscf-vmd/bin/vmd",
-        output_name=output_file.value
-    )
+        # Set options
+        options = dict(
+            render_res=(1920, 1080),
+            convert_to_png=True,
+            isovalue=isovalue.value,
+            rotate=rotate.value,
+            keep_vmd_input=True,
+            tachyon_path="/home/max/miniconda3/envs/qgps-latest/lib/tachyon_LINUXAMD64",
+            vmd_path="/home/max/miniconda3/envs/qgps-latest/bin/vmd",
+            output_name=f"{output_file.value}_{orbital_index}"
+        )
 
-    # Plot the orbital
-    with CubeFile(mol, orbital=orbital):
-        plotter = Plotter(**options)
-        plotter.run()
+        # Plot the orbital
+        with CubeFile(mol, orbital=orbital):
+            plotter = Plotter(**options)
+            plotter.run()
 
 
 if __name__ == '__main__':
