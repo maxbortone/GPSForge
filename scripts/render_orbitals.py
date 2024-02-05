@@ -17,11 +17,12 @@ from pyscf2vmd import Plotter, CubeFile
 
 FLAGS = flags.FLAGS
 
-orbitals = flags.DEFINE_list('orbitals', [14], 'Indices of the orbitals to plot')
+main_orbital = flags.DEFINE_integer('main_orbital', 14, 'Index of the main orbital to plot')
 K = flags.DEFINE_integer('K', 5, 'Number of closest coupled orbitals')
 output_file = flags.DEFINE_string('output_file', 'output', 'Output file name')
 rotate = flags.DEFINE_list('rotate', [-45.0, 0.0, 0.0], 'Rotation angles for VMD')
 isovalue = flags.DEFINE_float('isovalue', 0.36, 'Isovalue for VMD')
+zoom = flags.DEFINE_float('zoom', 1.0, 'Zoom value for VMD')
 
 
 _CONFIG = config_flags.DEFINE_config_file(
@@ -71,10 +72,12 @@ def main(argv):
     # Generate environment matrix of top-K closest coupled orbitals for each orbital
     top_k_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -K.value:], axis=1)
 
-    orbital_indices = np.array(orbitals.value, np.int32)
+    # orbital_indices = np.array(orbitals.value, np.int32)
+    orbital_indices = top_k_indices[int(main_orbital.value)]
     for orbital_index in orbital_indices:
         # Choose orbital
-        orbital = np.sum(basis[:, top_k_indices[orbital_index]], axis=1)
+        # orbital = np.sum(basis[:, top_k_indices[orbital_index]], axis=1)
+        orbital = basis[:, orbital_index]
 
         # Set options
         options = dict(
@@ -82,10 +85,11 @@ def main(argv):
             convert_to_png=True,
             isovalue=isovalue.value,
             rotate=rotate.value,
+            zoom=zoom.value,
             keep_vmd_input=True,
             tachyon_path="/home/max/miniconda3/envs/qgps-latest/lib/tachyon_LINUXAMD64",
             vmd_path="/home/max/miniconda3/envs/qgps-latest/bin/vmd",
-            output_name=f"{output_file.value}_{orbital_index}"
+            output_name=f"{output_file.value}_{main_orbital.value}_{orbital_index}"
         )
 
         # Plot the orbital
