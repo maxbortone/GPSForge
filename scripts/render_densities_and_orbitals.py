@@ -540,6 +540,8 @@ def main(argv):
 
         # Rotate exchange matrix into local basis
         vk = np.linalg.multi_dot((basis.T, vk, basis))
+    else:
+        basis = mf.mo_coeff
 
     # Generate environment matrix of top-K closest coupled orbitals for each orbital
     top_k_indices = np.flip(np.argsort(np.abs(vk), axis=1)[:, -K.value:], axis=1)
