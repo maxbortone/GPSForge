@@ -58,5 +58,5 @@ def get_CPDBackflow_config() -> ConfigDict:
     config.sigma = 0.01
     config.restricted = False
     config.fixed_magnetization = True
-    config.range_cutoff = placeholder(int)
+    config.exchange_cutoff = placeholder(int)
     return config

@@ -31,7 +31,8 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
         if config.system.get('frozen_electrons', None) is not None:
             return get_frozen_core_molecular_system(config.system, workdir=workdir)
         else:
-            return get_molecular_system(config.system, workdir=workdir)
+            store_exchange = config.model.get('exchange_cutoff', None) is not None
+            return get_molecular_system(config.system, workdir=workdir, store_exchange=store_exchange)
     elif 'Hubbard' in name:
         return get_Hubbard_system(config.system)
     else:
@@ -102,13 +103,14 @@ def build_molecule(config : ConfigDict):
         )
     return mol
 
-def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]:
+def get_molecular_system(config : ConfigDict, workdir : str=None, store_exchange : bool=False) -> Union[AbInitioHamiltonianOnTheFly, AbInitioHamiltonianSparse]:
     """
     Return the Hamiltonian for a molecular system
 
     Args:
         config : system configuration dictionary
         workdir : working directory
+        store_exchange : flag to store the exchange matrix
 
     Returns:
         Hamiltonian for the molecular system
@@ -201,6 +203,18 @@ def get_molecular_system(config : ConfigDict, workdir : str=None) -> Union[AbIni
             np.save(h1_path, h1)
             np.save(h2_path, h2)
             np.save(hf_orbitals_path, hf_orbitals)
+        # Store exchange matrix, if necessary
+        if store_exchange:
+            exchange_path = os.path.join(workdir, "exchange.npy")
+            if not os.path.exists(exchange_path):
+                # Get converged density matrix from the Hartree Fock
+                dm = mf.make_rdm1()
+                # Get exchange matrix
+                _, em = mf.get_jk(mol, dm)
+                # Transform to a local orbital basis, if necessary
+                if 'local' in config.basis:
+                    em = np.linalg.multi_dot((basis.T, em, basis))
+                np.save(exchange_path, em)
     else:
         h1 = None
         h2 = None
