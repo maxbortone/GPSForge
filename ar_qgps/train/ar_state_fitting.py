@@ -5,7 +5,7 @@ import numpy as np
 import netket as nk
 import GPSKet as qk
 from absl import logging
-from optax.experimental import split_real_and_imaginary
+from optax.contrib import split_real_and_imaginary
 from ar_qgps.datasets import get_dataset
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
