@@ -2,10 +2,13 @@ import os
 import sys
 base_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(base_path, "../"))
+import numpy as np
 from absl import app
 from absl import flags
 from absl import logging
 from pyscf import scf, cc, fci
+from pyblock2._pyscf.ao2mo import integrals as itg
+from pyblock2.driver.core import DMRGDriver, SymmetryTypes
 from ml_collections import config_flags
 from ar_qgps.configs.common import resolve
 from ar_qgps.systems import build_molecule, get_molecular_system
@@ -13,7 +16,7 @@ from ar_qgps.systems import build_molecule, get_molecular_system
 
 FLAGS = flags.FLAGS
 
-method = flags.DEFINE_string('method', 'CCSD', 'QC method used to compute the energy. Choose between: HF, CCSD, CCSD(T) and FCI.')
+method = flags.DEFINE_string('method', 'CCSD', 'QC method used to compute the energy. Choose between: HF, CCSD, CCSD(T), DMRG and FCI.')
 restricted = flags.DEFINE_bool('restricted', True, 'Flag to choose between a calculation with restricted or unrestricted spin orbitals')
 
 _CONFIG = config_flags.DEFINE_config_file(
@@ -55,6 +58,28 @@ def main(argv):
             if method.value == "CCSD(T)":
                 et = mycc.ccsd_t()
                 logging.info(f"CCSD(T) total energy {mycc.e_tot + et}")
+        elif method.value == "DMRG":
+            bond_dims = [250] * 4 + [500] * 4
+            noises = [1e-4] * 4 + [1e-5] * 4 + [0]
+            thrds = [1e-10] * 8
+            if restricted.value:
+                ncas, n_elec, spin, ecore, h1e, g2e, orb_sym = itg.get_rhf_integrals(mf, ncore=0, ncas=None, g2e_symm=8)
+                symm_type = SymmetryTypes.SU2
+            else:
+                ncas, n_elec, spin, ecore, h1e, g2e, orb_sym = itg.get_uhf_integrals(mf, ncore=0, ncas=None, g2e_symm=8)
+                symm_type = SymmetryTypes.SZ
+            driver = DMRGDriver(scratch="./tmp", symm_type=symm_type, n_threads=4)
+            # Orbital reordering
+            # g2e = driver.unpack_g2e(g2e, n_sites=ncas)
+            # idx = driver.orbital_reordering(h1e, g2e)
+            # h1e = h1e[idx][:, idx]
+            # g2e = g2e[idx][:, idx][:, :, idx][:, :, :, idx]
+            # orb_sym = np.array(orb_sym)[idx]
+            driver.initialize_system(n_sites=ncas, n_elec=n_elec, spin=spin, orb_sym=orb_sym)
+            mpo = driver.get_qc_mpo(h1e=h1e, g2e=g2e, ecore=ecore, iprint=1)
+            ket = driver.get_random_mps(tag="GS", bond_dim=250, nroots=1)
+            energy = driver.dmrg(mpo, ket, n_sweeps=20, bond_dims=bond_dims, noises=noises, thrds=thrds, iprint=1)
+            logging.info(f"DMRG energy {energy}")
     else:
         ha = get_molecular_system(config.system)
         n_electrons = sum(ha.hilbert._n_elec)
