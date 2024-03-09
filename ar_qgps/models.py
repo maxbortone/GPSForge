@@ -239,24 +239,24 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                 raise ValueError("Range cutoff is currently only supported for molecular systems.")
         else:
             environments = None
-        if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
-            phi = get_hf_orbitals_from_file(
-                config.system,
-                hilbert._n_elec,
-                workdir,
-                restricted=config.model.restricted, 
-                fixed_magnetization=config.model.fixed_magnetization
-            )
-        else:
-            phi = get_hf_orbitals(
-                config.system,
-                hamiltonian,
-                restricted=config.model.restricted,      
-                fixed_magnetization=config.model.fixed_magnetization
-            )
         if config.model.init_fun =='normal':
             init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
         elif config.model.init_fun == 'hf':
+            if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
+                phi = get_hf_orbitals_from_file(
+                    config.system,
+                    hilbert._n_elec,
+                    workdir,
+                    restricted=config.model.restricted, 
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
+            else:
+                phi = get_hf_orbitals(
+                    config.system,
+                    hamiltonian,
+                    restricted=config.model.restricted,      
+                    fixed_magnetization=config.model.fixed_magnetization
+                )
             def init_fun(key, shape, dtype):
                 epsilon = jnp.ones(shape, dtype=dtype)
                 epsilon = epsilon.at[:, :, :, 0, 0].set(
