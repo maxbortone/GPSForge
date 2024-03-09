@@ -27,7 +27,7 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name in ['Hchain', 'Hsheet', 'H2O', 'Cr2', 'Cr', 'N2']:
+    elif name in ['Hchain', 'Hring', 'Hsheet', 'H2O', 'Cr2', 'Cr', 'N2']:
         if config.system.get('frozen_electrons', None) is not None:
             return get_frozen_core_molecular_system(config.system, workdir=workdir)
         else:
@@ -62,7 +62,16 @@ def get_Heisenberg_system(config : ConfigDict) -> Heisenberg:
     ha = qk.operator.hamiltonian.get_J1_J2_Hamiltonian(Lx, Ly=Ly, J1=J1, J2=J2, total_sz=config.total_sz, sign_rule=sign_rule, pbc=config.pbc, on_the_fly_en=True)
     return ha
 
-def build_molecule(config : ConfigDict):
+def build_molecule(config : ConfigDict) -> gto.Mole:
+    """
+    Build a molecular PySCF object from a system configuration file
+
+    Args:
+        config : system configuration dictionary
+
+    Returns:
+        Mole object
+    """
     if config.get('atom', None):
         atom = config.atom
     else:

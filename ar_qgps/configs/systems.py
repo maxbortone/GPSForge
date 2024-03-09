@@ -13,6 +13,17 @@ def chain(config):
     config.system.molecule = [('H', (x*config.system.distance, 0., 0.)) for x in range(config.system.n_atoms)]
     return config
 
+def ring(config):
+    natoms = config.system.n_atoms
+    dist = config.system.distance
+    r = dist / (2 * math.sin(math.pi / natoms))
+    molecule = []
+    for i in range(natoms):
+        theta = i * (2 * math.pi / natoms)
+        molecule.append(('H', (r * math.cos(theta), r * math.sin(theta), 0.)))
+    config.system.molecule = molecule
+    return config
+
 def sheet(config):
     Lx, Ly = closest_divisors(config.system.n_atoms)
     molecule = []
@@ -121,6 +132,20 @@ def get_Hchain_config() -> ConfigDict:
     config.molecule = placeholder(list)
     with config.ignore_type():
         config.set_molecule = chain
+    return config
+
+def get_Hring_config() -> ConfigDict:
+    config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
+    config.n_atoms = 16
+    config.distance = 1.8
+    config.basis_set = 'sto-6g'
+    config.basis = 'canonical'
+    config.symmetry = True
+    config.unit = 'Bohr'
+    config.molecule = placeholder(list)
+    with config.ignore_type():
+        config.set_molecule = ring
     return config
 
 def get_Hsheet_config() -> ConfigDict:
