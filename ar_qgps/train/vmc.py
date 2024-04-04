@@ -1,5 +1,6 @@
 import os
 import time
+import jax
 import flax
 import ml_collections
 import numpy as np
@@ -118,6 +119,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         for step in range(initial_step, config.total_steps + 1):
             # Training step
             vmc.advance()
+            acceptance = vmc.state.sampler_state.acceptance
 
             # Report compilation time
             if MPIVars.rank == 0 and step == initial_step:
@@ -149,6 +151,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
                 logging.info(f"Step: {step}/{config.total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
                             f"E: {vmc.energy}, "
                             f"||∇E||: {grad_norm:.4f}, "
+                            f"acceptance: {acceptance}, "
                             f"{timer}")
 
             # Store checkpoint
@@ -219,7 +222,9 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         # Restore model
         best = restore_best_params(workdir)
         if best is not None:
-            vs.parameters = best['Parameters']
+            best_params = best["Parameters"]
+            best_params = jax.tree_map(lambda x: jnp.array(x, x.dtype), best_params)
+            vs.parameters = best_params
 
         # Update variational state settings
         vs.n_samples = config.evaluate.n_samples
