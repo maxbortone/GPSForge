@@ -60,3 +60,11 @@ def get_CPDBackflow_config() -> ConfigDict:
     config.fixed_magnetization = True
     config.exchange_cutoff = placeholder(int)
     return config
+
+def get_SlaterqGPS_config() -> ConfigDict:
+    config = ConfigDict()
+    # Parse support dimension later, allow int as well as tuples
+    config.M = '1'
+    config.dtype = 'real'
+    config.sigma = 0.1
+    return config

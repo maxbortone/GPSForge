@@ -32,6 +32,7 @@ _MODELS = {
     'PixelCNN': qk.models.PixelCNN,
     'BackflowCPD': qk.models.Backflow,
     'CPDBackflow': qk.models.CPDBackflow,
+    'SlaterqGPS': qk.models.SlaterqGPS,
 }
 
 def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optional[AbstractGraph]=None, hamiltonian : Hamiltonian = None, workdir: str=None) -> nn.Module:
@@ -57,7 +58,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         dtype = jnp.float64
     elif config.model.dtype == 'complex':
         dtype = jnp.complex128
-    if name != 'SegGPS' and 'GPS'  in name:
+    if name != 'SegGPS' and name != 'SlaterqGPS' and 'GPS'  in name:
         if isinstance(config.model.M, tuple):
             assert len(config.model.M) == hilbert.size
             M = HashableArray(np.array(config.M))
@@ -276,6 +277,41 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             restricted=config.model.restricted,
             fixed_magnetization=config.model.fixed_magnetization
         )
+    elif name == "SlaterqGPS":
+        if not isinstance(hilbert, qk.hilbert.FermionicDiscreteHilbert):
+            raise ValueError("SlaterqGPS Ansatz is only implemented for fermionic systems.")
+        if not hilbert._n_elec[0] == hilbert._n_elec[1]:
+            raise ValueError("SlaterqGPS Ansatz currently only supports restricted spin-orbitals.")
+        norb = hilbert.size
+        nelec = np.sum(hilbert._n_elec)
+        if isinstance(hamiltonian, qk.operator.hamiltonian.AbInitioHamiltonianOnTheFly):
+            phi = get_hf_orbitals_from_file(
+                config.system,
+                hilbert._n_elec,
+                workdir,
+                restricted=True, 
+                fixed_magnetization=True
+            )
+        else:
+            phi = get_hf_orbitals(
+                config.system,
+                hamiltonian,
+                restricted=True,      
+                fixed_magnetization=True
+            )
+        def slater_init(key, shape, dtype):
+            return jnp.array(phi).astype(dtype).reshape((1, norb, nelec // 2))
+        qGPS_init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
+        ma = ma_cls(
+            hilbert,
+            dtype=dtype,
+            M=config.model.M,
+            slater_init_fun=slater_init,
+            qGPS_init_fun=qGPS_init_fun,
+            apply_fast_update=True
+        )
+    else:
+        raise NotImplementedError(f"Model {name} is not implemented.")
     return ma
 
 def get_symmetry_transformation_spin(name : str, translations : bool, point_symmetries: bool, spin_flip : bool, graph : AbstractGraph) -> Union[Tuple[Callable, Callable], Callable]:
