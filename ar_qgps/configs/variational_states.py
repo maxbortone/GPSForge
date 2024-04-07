@@ -23,6 +23,7 @@ def get_MCStateUniqueSamples_config(parent : ConfigDict) -> ConfigDict:
     config.chunk_size = placeholder(int)
     config.max_sampling_steps = placeholder(int)
     config.fill_with_random = False
+    config.seed = placeholder(int)
     return config
 
 def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
@@ -38,4 +39,5 @@ def get_MCStateStratifiedSampling_config(parent : ConfigDict) -> ConfigDict:
     config.dataset = get_dataset_config()
     config.renormalize = False
     config.rand_norm = False
+    config.seed = placeholder(int)
     return config
