@@ -22,7 +22,6 @@ def get_MCStateUniqueSamples_config(parent : ConfigDict) -> ConfigDict:
         config.n_discard_per_chain = config.get_ref('n_samples') // 10
     config.chunk_size = placeholder(int)
     config.max_sampling_steps = placeholder(int)
-    config.fill_with_random = False
     config.seed = placeholder(int)
     return config
 
