@@ -151,7 +151,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
                 logging.info(f"Step: {step}/{config.total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
                             f"E: {vmc.energy}, "
                             f"||∇E||: {grad_norm:.4f}, "
-                            f"acceptance: {acceptance}, "
+                            f"acceptance: {acceptance*100:.2f}%, "
                             f"{timer}")
 
             # Store checkpoint
@@ -178,6 +178,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         for step in range(step+1, total_steps + 1):
             # Training step
             vmc.advance()
+            acceptance = vmc.state.sampler_state.acceptance
 
             # Report compilation time
             if MPIVars.rank == 0 and step == 1:
@@ -209,6 +210,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
                 logging.info(f"Step: {step}/{total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation
                             f"E: {vmc.energy}, "
                             f"||∇E||: {grad_norm:.4f}, "
+                            f"acceptance: {acceptance*100:.2f}%, "
                             f"{timer}")
 
             # Store checkpoint

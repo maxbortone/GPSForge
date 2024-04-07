@@ -15,7 +15,7 @@ def get_FullSumState_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     return config
 
-def get_MCStateUniqeSamples_config(parent : ConfigDict) -> ConfigDict:
+def get_MCStateUniqueSamples_config(parent : ConfigDict) -> ConfigDict:
     config = ConfigDict()
     config.n_samples = 100
     if parent.get_ref('sampler_name') != 'ARDirectSampler':
