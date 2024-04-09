@@ -2,6 +2,7 @@ import os
 import sys
 base_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(base_path, "../"))
+import subprocess
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,29 +10,57 @@ import netket as nk
 from absl import app
 from absl import flags
 from absl import logging
+from ml_collections import config_flags, ConfigDict
+from ar_qgps.configs.common import resolve
 from ar_qgps.systems import get_system
 from ar_qgps.models import get_model
 from ar_qgps.samplers import get_sampler
 from ar_qgps.variational_states import get_variational_state
 from GPSKet.operator.hamiltonian.ab_initio import local_en_on_the_fly
-from VMCutils import MPIVars, read_config, restore_best_params
+from VMCutils import MPIVars, add_file_logger, read_config, restore_best_params
 
 
 FLAGS = flags.FLAGS
 
-WORKDIR = flags.DEFINE_string('workdir', None, 'Directory to the model data.')
+_WORKDIR = flags.DEFINE_string(
+    'workdir',
+    None,
+    'Directory to the model data.',
+    required=True
+)
 
-flags.mark_flag_as_required('workdir')
+_CONFIG = config_flags.DEFINE_config_file(
+    'config',
+    None,
+    'File path to the system, Ansatz and optimiser configuration.',
+    lock_config=True
+)
 
 def main(argv):
     if len(argv) > 1:
         raise app.UsageError('Too many command-line arguments.')
 
     # Parse flags
-    workdir = WORKDIR.value
+    workdir = _WORKDIR.value
+    config = _CONFIG.value
+    filename = os.path.join(workdir, "config.yaml")
+    if os.path.isfile(filename) and config is None:
+        config = ConfigDict(read_config(workdir))
+    config = resolve(config)
 
-    # Get config
-    config = read_config(workdir)
+    if MPIVars.rank == 0:
+        add_file_logger(workdir, basename="evaluate_rdms")
+
+    logging.info(f"JAX local devices: {jax.local_devices()}")
+    if MPIVars.rank == 0:
+        platform = jax.lib.xla_bridge.get_backend().platform
+        if platform == "gpu":
+            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
+            logging.info(f"{result.stdout}")
+        logging.info(f"JAX device count: {MPIVars.n_nodes}")
+        jax_xla_backend = ('None' if FLAGS.jax_xla_backend is None else FLAGS.jax_xla_backend)
+        logging.info(f"Using JAX XLA backend {jax_xla_backend}")
+        logging.info(f"Config: \n{config}")
 
     # Setup system and model
     ha = get_system(config, workdir=workdir)
@@ -59,6 +88,7 @@ def main(argv):
         use_fast_update = vs.model.apply_fast_update
     except:
         use_fast_update = False
+    logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
     _, local_rdm1, local_rdm2 = local_en_on_the_fly(
         n_elec,
         vs._apply_fun,
