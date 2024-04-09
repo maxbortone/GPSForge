@@ -84,14 +84,20 @@ def main(argv):
     if MPIVars.rank == 0:
         logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
     n_samples = config.evaluate.n_samples
+    if n_samples % MPIVars.n_nodes != 0:
+        raise ValueError("The number samples must be divisible by the number of MPI ranks")
+    n_samples_per_rank = config.evaluate.n_samples // MPIVars.n_nodes
     chunk_size = config.evaluate.chunk_size
-    n_chunks = n_samples // chunk_size
+    if n_samples_per_rank % chunk_size != 0:
+        raise ValueError("The number of samples per rank must be divisible by the chunk size")
+    vs.n_samples = chunk_size
+    n_chunks = n_samples_per_rank // chunk_size
     rdm1 = jnp.zeros((norb, norb), dtype=jnp.float32)
     rdm2 = jnp.zeros((norb, norb, norb, norb), dtype=jnp.float32)
     for i in range(1, n_chunks+1):
         # Sample state
         vs.reset()
-        samples = vs.sample(n_samples=chunk_size)
+        samples = vs.sample()
         samples = samples.reshape((-1, norb))
 
         # Evaluate RDMs
