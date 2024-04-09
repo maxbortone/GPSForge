@@ -88,7 +88,8 @@ def main(argv):
         use_fast_update = vs.model.apply_fast_update
     except:
         use_fast_update = False
-    logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
+    if MPIVars.rank == 0:
+        logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
     _, local_rdm1, local_rdm2 = local_en_on_the_fly(
         n_elec,
         vs._apply_fun,
