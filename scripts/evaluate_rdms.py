@@ -76,13 +76,6 @@ def main(argv):
     best_params = jax.tree_map(lambda x: jnp.array(x, x.dtype), best_params)
     vs.parameters = best_params
 
-    # Sample state
-    n_samples = config.evaluate.n_samples
-    vs.chunk_size = config.evaluate.chunk_size
-    vs.reset()
-    samples = vs.sample(n_samples=n_samples)
-    samples = samples.reshape((-1, norb))
-
     # Compute RDMs
     try:
         use_fast_update = vs.model.apply_fast_update
@@ -90,24 +83,36 @@ def main(argv):
         use_fast_update = False
     if MPIVars.rank == 0:
         logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
-    local_en, local_rdm1, local_rdm2 = local_en_on_the_fly(
-        n_elec,
-        vs._apply_fun,
-        vs.variables,
-        samples,
-        (jnp.array(ha.t_mat), jnp.array(ha.eri_mat)),
-        use_fast_update=use_fast_update,
-        chunk_size=config.evaluate.chunk_size,
-        return_local_RDMs=True
-    )
-    stats = nk.stats.statistics(local_en)
-    acceptance = vs.sampler_state.acceptance
-    if MPIVars.rank == 0:
-        logging.info(f"E: {stats}, acceptance: {acceptance}")
-    rdm1, _ = nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm1, axis=0))
-    rdm1 = np.array(rdm1).real / n_samples
-    rdm2, _ = nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm2, axis=0))
-    rdm2 = np.array(rdm2).real / n_samples
+    n_samples = config.evaluate.n_samples
+    chunk_size = config.evaluate.chunk_size
+    n_chunks = n_samples // chunk_size
+    rdm1 = jnp.zeros((norb, norb), dtype=jnp.float32)
+    rdm2 = jnp.zeros((norb, norb, norb, norb), dtype=jnp.float32)
+    for i in range(1, n_chunks+1):
+        # Sample state
+        vs.reset()
+        samples = vs.sample(n_samples=chunk_size)
+        samples = samples.reshape((-1, norb))
+
+        # Evaluate RDMs
+        local_en, local_rdm1, local_rdm2 = local_en_on_the_fly(
+            n_elec,
+            vs._apply_fun,
+            vs.variables,
+            samples,
+            (jnp.array(ha.t_mat), jnp.array(ha.eri_mat)),
+            use_fast_update=use_fast_update,
+            # chunk_size=config.evaluate.chunk_size,
+            return_local_RDMs=True
+        )
+        stats = nk.stats.statistics(local_en)
+        acceptance = vs.sampler_state.acceptance
+        if MPIVars.rank == 0:
+            logging.info(f"[Chunk: {i}/{n_chunks}] E: {stats}, acceptance: {acceptance*100:.2f}%")
+        rdm1 += nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm1, axis=0))[0]
+        rdm2 += nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm2, axis=0))[0]
+    rdm1 = np.array(rdm1) / n_samples
+    rdm2 = np.array(rdm2) / n_samples
 
     # Re-order into (p^+ r^+ s q) form
     rdm2 *= 2
