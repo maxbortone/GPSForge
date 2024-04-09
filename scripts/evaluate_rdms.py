@@ -90,7 +90,7 @@ def main(argv):
         use_fast_update = False
     if MPIVars.rank == 0:
         logging.info(f"Computing RDMs: fast update {'ON' if use_fast_update else 'OFF'}")
-    _, local_rdm1, local_rdm2 = local_en_on_the_fly(
+    local_en, local_rdm1, local_rdm2 = local_en_on_the_fly(
         n_elec,
         vs._apply_fun,
         vs.variables,
@@ -100,6 +100,10 @@ def main(argv):
         chunk_size=config.evaluate.chunk_size,
         return_local_RDMs=True
     )
+    stats = nk.stats.statistics(local_en)
+    acceptance = vs.sampler_state.acceptance
+    if MPIVars.rank == 0:
+        logging.info(f"E: {stats}, acceptance: {acceptance}")
     rdm1, _ = nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm1, axis=0))
     rdm1 = np.array(rdm1).real / n_samples
     rdm2, _ = nk.utils.mpi.mpi_sum_jax(jnp.sum(local_rdm2, axis=0))
