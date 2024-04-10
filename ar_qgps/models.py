@@ -181,7 +181,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
             )
         if config.model.init_fun =='normal':
             init_fun = qk.nn.initializers.normal(config.model.sigma, dtype=dtype)
-            orbitals = phi
+            orbitals = HashableArray(phi)
         elif config.model.init_fun == 'hf':
             def init_fun(key, shape, dtype):
                 epsilon = jnp.ones(shape, dtype=dtype)
@@ -194,7 +194,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                     key, shape=epsilon.shape, dtype=dtype
                 )
                 return epsilon
-            orbitals = np.zeros_like(phi)
+            orbitals = None
         elif config.model.init_fun == 'hf-dist':
             def init_fun(key, shape, dtype):
                 phi_init = phi.flatten()
@@ -208,7 +208,7 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
                     key, shape=epsilon.shape, dtype=dtype
                 )
                 return epsilon
-            orbitals = np.zeros_like(phi)
+            orbitals = None
         correction_fn = qk.models.qGPS(
             hilbert,
             total_supp_dim,
@@ -219,8 +219,8 @@ def get_model(config : ConfigDict, hilbert : HomogeneousHilbert, graph : Optiona
         )
         ma = ma_cls(
             hilbert,
-            HashableArray(orbitals),
             correction_fn,
+            orbitals=orbitals,
             spin_symmetry_by_structure=config.model.restricted,
             fixed_magnetization=config.model.fixed_magnetization,
             apply_fast_update=True
