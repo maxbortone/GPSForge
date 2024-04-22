@@ -183,9 +183,6 @@ class FSSC(nk.driver.AbstractVariationalDriver):
             union_space = union_space[:idx_fill]
         start = time.time()
         log_amps, _ = self._apply_fun({'params': params, **model_state}, union_space, **self._apply_fun_kwargs)
-        # NOTE: in order for this jitted function not to be recompiled all the time the union_space size changes, it might be best to keep the union_space size fixed
-        # and post-select the unvalid configurations based on the value of idx_fill
-        # log_amps, _ = jax.jit(self._apply_fun, static_argnames=("mutable", "cache_intermediates"))({'params': params, **model_state}, union_space, **self._apply_fun_kwargs)
         end = time.time()
         print(f"`apply_fun` took {end-start:.2f} seconds to compute {np.prod(union_space.shape[:-1])} log-amplitudes")
 
@@ -304,7 +301,7 @@ def deserialize_FSSC(driver: FSSC, state_dict: dict):
 
     new_driver = copy.copy(driver)
     new_driver.core_space = serialization.from_state_dict(driver.core_space, state_dict["core_space"])
-    new_driver.variables = serialization.from_state_dict(driver.state.variables, state_dict["variables"])
+    new_driver.state.variables = serialization.from_state_dict(driver.state.variables, state_dict["variables"])
     new_driver._optimizer_state = serialization.from_state_dict(driver._optimizer_state, state_dict["optimizer"])
     new_driver._step_count = serialization.from_state_dict(driver._step_count, state_dict["step"])
     return new_driver
