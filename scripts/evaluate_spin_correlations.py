@@ -11,8 +11,8 @@ import GPSKet as qk
 from absl import app
 from absl import flags
 from absl import logging
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
 from VMCutils import MPIVars, Timer, add_file_logger
 from VMCutils import read_config, restore_checkpoint
 

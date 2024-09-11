@@ -5,8 +5,8 @@ from absl import app
 from absl import flags
 from absl import logging
 from ml_collections import config_flags, ConfigDict
-from ar_qgps import train
-from ar_qgps.configs.common import resolve
+from gps_forge import train
+from gps_forge.configs.common import resolve
 from VMCutils import MPIVars, add_file_logger, read_config, write_config
 
 

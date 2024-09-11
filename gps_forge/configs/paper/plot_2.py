@@ -2,7 +2,7 @@
 # The fully-variational autoregressive formulation above has cost $\mathcal{O}(L^2)$. This can be reduced by a factor of $\mathcal{O}(L)$ using one of these two strategies:
 # 1. share weights between subsequent local correlators, i.e. parametrize them as $\psi_i = \psi_{\theta_{<i}}$
 # 2. use the same translationally-invariant correlator for each site, i.e. $\psi_i = \psi_0$
-from ar_qgps.configs import vmc
+from gps_forge.configs import vmc
 
 
 def get_config(options):

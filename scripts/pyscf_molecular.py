@@ -10,8 +10,8 @@ from pyscf import scf, cc, fci
 from pyblock2._pyscf.ao2mo import integrals as itg
 from pyblock2.driver.core import DMRGDriver, SymmetryTypes
 from ml_collections import config_flags
-from ar_qgps.configs.common import resolve
-from ar_qgps.systems import build_molecule, get_molecular_system
+from gps_forge.configs.common import resolve
+from gps_forge.systems import build_molecule, get_molecular_system
 
 
 FLAGS = flags.FLAGS

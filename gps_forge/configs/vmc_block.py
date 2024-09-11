@@ -1,10 +1,10 @@
 from ml_collections import ConfigDict
-from ar_qgps.configs import common
-from ar_qgps.configs import systems
-from ar_qgps.configs import models
-from ar_qgps.configs import samplers
-from ar_qgps.configs.variational_states import get_MCState_config
-from ar_qgps.configs.optimizers import get_SRRMSProp_config
+from gps_forge.configs import common
+from gps_forge.configs import systems
+from gps_forge.configs import models
+from gps_forge.configs import samplers
+from gps_forge.configs.variational_states import get_MCState_config
+from gps_forge.configs.optimizers import get_SRRMSProp_config
 
 
 def get_config(modules) -> ConfigDict:

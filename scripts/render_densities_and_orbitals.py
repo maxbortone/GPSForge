@@ -11,8 +11,8 @@ from absl import logging
 from typing import Iterable, Union, Any
 from pyscf import scf, gto, lo, lib
 from pyscf.dft import numint
-from ar_qgps.configs.common import resolve
-from ar_qgps.systems import build_molecule
+from gps_forge.configs.common import resolve
+from gps_forge.systems import build_molecule
 from ml_collections import config_flags
 
 

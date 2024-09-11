@@ -12,11 +12,11 @@ import plotext as plt
 from absl import logging
 from timeit import default_timer as timer
 from datetime import timedelta
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
-from ar_qgps.samplers import get_sampler
-from ar_qgps.variational_states import get_variational_state
-from ar_qgps.optimizers import get_optimizer
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
+from gps_forge.samplers import get_sampler
+from gps_forge.variational_states import get_variational_state
+from gps_forge.optimizers import get_optimizer
 from VMCutils import MPIVars, CSVLogger
 
 

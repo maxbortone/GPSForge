@@ -7,10 +7,10 @@ from absl import flags
 from absl import logging
 from pyscf import gto, scf, cc
 from ml_collections import config_flags
-from ar_qgps.configs import systems
-from ar_qgps.configs.common import resolve
-from ar_qgps.models import setup_mol
-from ar_qgps.systems import get_Hubbard_system
+from gps_forge.configs import systems
+from gps_forge.configs.common import resolve
+from gps_forge.models import setup_mol
+from gps_forge.systems import get_Hubbard_system
 from pyscf import scf, ao2mo, fci
 
 

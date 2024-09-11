@@ -17,7 +17,7 @@ from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, FermiHubbar
 from VMCutils import MPIVars
 from plum import dispatch
 from typing import Union, Tuple, Callable, Optional
-from ar_qgps.systems import build_molecule
+from gps_forge.systems import build_molecule
 
 
 Hamiltonian = Union[AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly]

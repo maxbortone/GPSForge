@@ -11,11 +11,11 @@ from absl import app
 from absl import flags
 from absl import logging
 from ml_collections import config_flags, ConfigDict
-from ar_qgps.configs.common import resolve
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
-from ar_qgps.samplers import get_sampler
-from ar_qgps.variational_states import get_variational_state
+from gps_forge.configs.common import resolve
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
+from gps_forge.samplers import get_sampler
+from gps_forge.variational_states import get_variational_state
 from GPSKet.operator.hamiltonian.ab_initio import local_en_on_the_fly
 from VMCutils import MPIVars, add_file_logger, read_config, restore_best_params
 

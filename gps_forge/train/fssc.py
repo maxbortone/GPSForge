@@ -16,11 +16,11 @@ from netket.stats import Stats
 from netket.driver.vmc_common import info
 from netket.vqs.mc.mc_state.state import check_chunk_size, _is_power_of_two
 from GPSKet.operator.hamiltonian.ab_initio import local_en_on_the_fly
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
-from ar_qgps.samplers import get_sampler
-from ar_qgps.variational_states import get_variational_state
-from ar_qgps.optimizers import get_optimizer
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
+from gps_forge.samplers import get_sampler
+from gps_forge.variational_states import get_variational_state
+from gps_forge.optimizers import get_optimizer
 from VMCutils import MPIVars, Timer, CSVLogger
 from VMCutils import restore_best_params, save_best_params
 from flax import core as fcore

@@ -1,9 +1,9 @@
 from ml_collections import ConfigDict
-from ar_qgps.configs import systems
-from ar_qgps.configs import models
-from ar_qgps.configs import samplers
-from ar_qgps.configs import variational_states
-from ar_qgps.configs import optimizers
+from gps_forge.configs import systems
+from gps_forge.configs import models
+from gps_forge.configs import samplers
+from gps_forge.configs import variational_states
+from gps_forge.configs import optimizers
 
 
 def get_config(modules) -> ConfigDict:

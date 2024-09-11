@@ -6,9 +6,9 @@ import pyscf
 import numpy as np
 import pandas as pd
 from ml_collections import ConfigDict
-from ar_qgps.configs.systems import get_config
-from ar_qgps.configs.common import resolve
-from ar_qgps.systems import build_molecule
+from gps_forge.configs.systems import get_config
+from gps_forge.configs.common import resolve
+from gps_forge.systems import build_molecule
 try:
     from vayesta.ewf import EWF
 except:

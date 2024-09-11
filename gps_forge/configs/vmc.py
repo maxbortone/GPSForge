@@ -1,11 +1,11 @@
 from ml_collections import ConfigDict
-from ar_qgps.configs import common
-from ar_qgps.configs import datasets
-from ar_qgps.configs import systems
-from ar_qgps.configs import models
-from ar_qgps.configs import samplers
-from ar_qgps.configs import variational_states
-from ar_qgps.configs import optimizers
+from ml_collections.config_dict import placeholder
+from gps_forge.configs import common
+from gps_forge.configs import systems
+from gps_forge.configs import models
+from gps_forge.configs import samplers
+from gps_forge.configs import variational_states
+from gps_forge.configs import optimizers
 
 
 def get_config(modules) -> ConfigDict:
@@ -14,13 +14,7 @@ def get_config(modules) -> ConfigDict:
     system, model, sampler, variational_state, optimizer = modules.split(',')
 
     # Training script
-    config.trainer = 'ar_state_fitting'
-    config.mini_batch_size = 32
-
-    # Dataset
-    get_dataset_config = getattr(datasets, f"get_{system}_config")
-    config.dataset_name = system
-    config.dataset = get_dataset_config()
+    config.trainer = 'vmc'
 
     # System
     get_system_config = getattr(systems, f"get_{system}_config")
@@ -46,5 +40,16 @@ def get_config(modules) -> ConfigDict:
     get_optimizer_config = getattr(optimizers, f"get_{optimizer}_config")
     config.optimizer_name = optimizer
     config.optimizer = get_optimizer_config()
+
+    # Descent finishing
+    config.descent_finishing = ConfigDict()
+    config.descent_finishing.total_steps = 50
+    config.descent_finishing.learning_rate = 0.001
+
+    # Evaluation configs
+    config.evaluate = ConfigDict()
+    config.evaluate.total_steps = 10
+    config.evaluate.n_samples = 10*config.variational_state.get_ref('n_samples')
+    config.evaluate.chunk_size = placeholder(int)
 
     return config.lock()

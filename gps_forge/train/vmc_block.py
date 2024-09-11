@@ -9,9 +9,9 @@ import GPSKet as qk
 from copy import deepcopy
 from absl import logging
 from netket.utils.types import Callable, PyTree, Array
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
-from ar_qgps.samplers import get_sampler
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
+from gps_forge.samplers import get_sampler
 from VMCutils import MPIVars, Timer, CSVLogger
 from VMCutils import restore_best_params, save_best_params
 

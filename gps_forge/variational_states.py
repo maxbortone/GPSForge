@@ -38,7 +38,7 @@ def get_variational_state(config : ConfigDict, model: nn.Module, hilbert : Optio
         if 'StratifiedSampling' in config.variational_state_name:
             sampler = qk.sampler.MetropolisHopping(hilbert, n_sweeps=config.variational_state.n_sweeps, n_chains_per_rank=1)
             if MPIVars.rank == 0:
-                from ar_qgps.datasets import get_dataset
+                from gps_forge.datasets import get_dataset
 
                 dataset = get_dataset(config.system_name, config.variational_state.dataset)
                 det_set_size = config.variational_state.deterministic_set_size

@@ -6,10 +6,10 @@ import netket as nk
 import GPSKet as qk
 from absl import logging
 from optax.contrib import split_real_and_imaginary
-from ar_qgps.datasets import get_dataset
-from ar_qgps.systems import get_system
-from ar_qgps.models import get_model
-from ar_qgps.variational_states import get_variational_state
+from gps_forge.datasets import get_dataset
+from gps_forge.systems import get_system
+from gps_forge.models import get_model
+from gps_forge.variational_states import get_variational_state
 from VMCutils import MPIVars, Timer, CSVLogger
 from flax import serialization
 from flax.training.checkpoints import save_checkpoint, restore_checkpoint
