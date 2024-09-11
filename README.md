@@ -1,7 +1,8 @@
-# AR-qGPS
+# GPSForge
 
-This repository holds the code to train and test the autoregressive form of the qGPS Ansatz, as well as its original formulation.
-Both models are implemented in [GPSKet](https://github.com/BoothGroup/GPSKet), a plugin for the [NetKet](https://github.com/netket/netket) framework, which uses [JAX](https://github.com/google/jax) to build machine-learning models of wavefunction Ansatze for quantum many-body problems.
+GPSForge is a battle-hardened library for training wavefunction models based on the [Gaussian Process State](https://link.aps.org/doi/10.1103/PhysRevResearch.4.023126) with Variational Monte Carlo, with a particular focus on challenging quantum chemical systems.
+All the models are implemented in [GPSKet](https://github.com/BoothGroup/GPSKet), a plugin for the [NetKet](https://github.com/netket/netket) framework, which uses [JAX](https://github.com/google/jax) to build machine-learning models of wavefunction Ansatze for quantum many-body problems.
+The library takes a modular approach for quick and reproducible experimentation.
 
 ## Installation and Usage
 
@@ -14,24 +15,31 @@ Importantly, configurations can be overwritten at the command line by specifying
 
 For example, to optimize the autoregressive qGPS on the 1D Heisenberg system with 10 sites, run
 ```
-python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+python -m gps_forge.main --config=$(pwd)/gps_forge/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```
 
 The list of comma separated names after the path to the configuration file correspond to class names for the system, the Ansatz, the sampler, the variational state and the optimizer respectively.
 Currently the following options are available:
     
 - System:
-    - `Heisenberg1d`: one dimensional spin system with nearest neighbor Heisenberg interaction
-    - `Heisenberg2d`: two dimensional spin system with nearest neighbor Heisenberg interaction
-    - `J1J22d`: two dimensional spin system with nearest neighbor and next-nearest neighbor Heisenberg interaction
-    - `Hchain`: one dimensional chain of Hydrogen atoms separated by a certain interatomic distance
+    - `Heisenberg1d`: one-dimensional spin system with nearest neighbor Heisenberg interaction
+    - `Heisenberg2d`: two-dimensional spin system with nearest neighbor Heisenberg interaction
+    - `J1J22d`: two-dimensional spin system with nearest neighbor and next-nearest neighbor Heisenberg interaction
+    - `Hchain`: one-dimensional chain of Hydrogen atoms separated by a certain interatomic distance
+    - `Hring`: one-dimensional ring of Hydrogen atoms separated by a certain interatomic distance
+    - `Hsheet`: two-dimensional sheet of Hydrogen atoms separated by a certain interatomic distance
     - `H2O`: water molecule
-    - `Hubbard1d`: one dimensional fermionic Fermi-Hubbard system
+    - `N2`: nitrogen dimer
+    - `Cr2`: Chromium dimer
+    - `Hubbard1d`: one-dimensional fermionic Fermi-Hubbard system
+    - `Hubbard2d`: two-dimensional fermionic Fermi-Hubbard system
 - Ansatz:
     - `ARqGPSFull`: fully variational autoregressive qGPS model
     - `ARPlaquetteqGPS`: filter-based autoregressive qGPS model
     - `ARqGPS`: autoregressive qGPS model with weight-sharing
     - `qGPS`: qGPS model
+    - `CPDBackflow`: backflow model with CP-decomposed orbitals
+    - `SlaterqGPS`: Slater-Jastrow wavefunction with a qGPS Jastrow factor
 - Sampler:
     - `ARDirectSampler`: direct sampler for autoregressive models
     - `MetropolisExchange`: Metropolis sampler with exchange rule for spin systems
@@ -46,6 +54,7 @@ Currently the following options are available:
     - `Adam`: Adam optimizer
     - `SRDense`: Stochastic gradient descent optimizer with Stochastic Reconfiguration preconditioning of gradients (uses the dense Quantum Geometric Tensor)
     - `SRRMSProp`: SR with RMSProp diagonal shift
+    - `kernelSR`: SR optimizer with a kernel trick for training large models
 
 ## Setup on GPU nodes
 To run code on GPU nodes in a HPC cluster, follow these steps.
@@ -104,5 +113,5 @@ chmod +x bind_gpu.sh
 
 9. Run your job with as many ranks as available GPU devices (e.g. 4 ranks on a node with 4 GPUs):
 ```
-mpirun -n 4 bind_gpu.sh python -m ar_qgps.main --config=$(pwd)/ar_qgps/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
+mpirun -n 4 bind_gpu.sh python -m gps_forge.main --config=$(pwd)/gps_forge/configs/vmc.py:Heisenberg1d,ARqGPS,ARDirectSampler,MCState,SRDense --workdir=$(pwd)/tmp/arqgps-$(date +%s) --config.total_steps=1000 --config.variational_state.n_samples=1000
 ```
