@@ -377,7 +377,7 @@ def get_Hubbard_system(config: ConfigDict, return_graph: bool=False) -> FermiHub
     Ly = config.get('Ly', 1)
     t = config.t
     U = config.U
-    n_elec = config.get('n_elec', None)
+    n_elec = tuple(config.get('n_elec', None))
     if Ly > 1:
         # config.pbc:
         # - 'PBC-PBC' = periodic boundary conditions in both dimensions

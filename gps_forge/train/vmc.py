@@ -31,7 +31,7 @@ def serialize_VMC(driver: nk.driver.VMC):
         "step": driver._step_count
     }
     # TODO: improve this by including the predconditioner state in the optimizer state
-    if type(driver.preconditioner).__name__ == "SRRMSProp":
+    if hasattr(driver, "preconditioner") and type(driver.preconditioner).__name__ == "SRRMSProp":
         state_dict["preconditioner"] = serialization.to_state_dict(driver.preconditioner._ema)
     return state_dict
 
@@ -42,7 +42,7 @@ def deserialize_VMC(driver: nk.driver.VMC, state_dict: dict):
     new_driver.state.variables = serialization.from_state_dict(driver.state.variables, state_dict["variables"])
     new_driver._optimizer_state = serialization.from_state_dict(driver._optimizer_state, state_dict["optimizer"])
     new_driver._step_count = serialization.from_state_dict(driver._step_count, state_dict["step"])
-    if type(driver.preconditioner).__name__ == "SRRMSProp":
+    if hasattr(driver, "preconditioner") and type(driver.preconditioner).__name__ == "SRRMSProp":
         new_driver.preconditioner._ema = serialization.from_state_dict(driver.preconditioner._ema, state_dict["preconditioner"])
     return new_driver
 
