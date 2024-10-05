@@ -216,7 +216,7 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
             # Store checkpoint
             if MPIVars.rank == 0:
                 # TODO: migrate to new orbax API (see: https://flax.readthedocs.io/en/latest/guides/use_checkpointing.htm)
-                checkpoint_path = save_checkpoint(checkpoints_dir, vmc, step, keep_every_n_steps=1)
+                checkpoint_path = save_checkpoint(checkpoints_dir, vmc, step)
                 logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")
 
     # Evaluate model
