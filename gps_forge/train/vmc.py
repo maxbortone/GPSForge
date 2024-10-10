@@ -120,7 +120,10 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         for step in range(initial_step, config.total_steps + 1):
             # Training step
             vmc.advance()
-            acceptance = vmc.state.sampler_state.acceptance
+            if hasattr(vmc.state.sampler_state, 'acceptance'):
+                acceptance = vmc.state.sampler_state.acceptance
+            else:
+                acceptance = 1.0
 
             # Report compilation time
             if mpi_rank == 0 and step == initial_step:
@@ -179,7 +182,10 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         for step in range(step+1, total_steps + 1):
             # Training step
             vmc.advance()
-            acceptance = vmc.state.sampler_state.acceptance
+            if hasattr(vmc.state.sampler_state, 'acceptance'):
+                acceptance = vmc.state.sampler_state.acceptance
+            else:
+                acceptance = 1.0
 
             # Report compilation time
             if mpi_rank == 0 and step == 1:
