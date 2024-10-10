@@ -6,7 +6,8 @@ from netket.hilbert import HomogeneousHilbert
 from netket.sampler import Sampler
 from ml_collections import ConfigDict
 from typing import Optional
-from VMCutils import MPIVars
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import mpi_bcast
 
 
 _VARIATIONAL_STATES = {
@@ -37,7 +38,7 @@ def get_variational_state(config : ConfigDict, model: nn.Module, hilbert : Optio
     if 'MCState' in config.variational_state_name:
         if 'StratifiedSampling' in config.variational_state_name:
             sampler = qk.sampler.MetropolisHopping(hilbert, n_sweeps=config.variational_state.n_sweeps, n_chains_per_rank=1)
-            if MPIVars.rank == 0:
+            if mpi_rank == 0:
                 from gps_forge.datasets import get_dataset
 
                 dataset = get_dataset(config.system_name, config.variational_state.dataset)
@@ -50,8 +51,8 @@ def get_variational_state(config : ConfigDict, model: nn.Module, hilbert : Optio
             else:
                 hilbert_size = None
                 det_set = None
-            hilbert_size = MPIVars.comm.bcast(hilbert_size, root=0)
-            det_set = MPIVars.comm.bcast(det_set, root=0)
+            hilbert_size = mpi_bcast(hilbert_size, root=0)
+            det_set = mpi_bcast(det_set, root=0)
             args = [det_set, hilbert_size, sampler, model]
         else:
             args = [sampler, model]

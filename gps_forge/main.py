@@ -7,7 +7,9 @@ from absl import logging
 from ml_collections import config_flags, ConfigDict
 from gps_forge import train
 from gps_forge.configs.common import resolve
-from VMCutils import MPIVars, add_file_logger, read_config, write_config
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import n_nodes as mpi_n_nodes
+from VMCutils import add_file_logger, read_config, write_config
 
 
 FLAGS = flags.FLAGS
@@ -38,16 +40,16 @@ def main(argv):
         config = ConfigDict(read_config(workdir))
     config = resolve(config)
 
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         add_file_logger(workdir, basename=config.trainer)
 
     logging.info(f"JAX local devices: {jax.local_devices()}")
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         platform = jax.lib.xla_bridge.get_backend().platform
         if platform == "gpu":
             result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
             logging.info(f"{result.stdout}")
-        logging.info(f"JAX device count: {MPIVars.n_nodes}")
+        logging.info(f"JAX device count: {mpi_n_nodes}")
         jax_xla_backend = ('None' if FLAGS.jax_xla_backend is None else FLAGS.jax_xla_backend)
         logging.info(f"Using JAX XLA backend {jax_xla_backend}")
         logging.info(f"Config: \n{config}")

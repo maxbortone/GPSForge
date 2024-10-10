@@ -14,10 +14,10 @@ from netket.utils.types import Array
 from ml_collections import ConfigDict
 from pyscf import gto, scf, ao2mo
 from GPSKet.operator.hamiltonian import AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly
-from VMCutils import MPIVars
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import mpi_bcast
 from plum import dispatch
 from typing import Union, Tuple, Callable, Optional
-from gps_forge.systems import build_molecule
 
 
 Hamiltonian = Union[AbInitioHamiltonianOnTheFly, FermiHubbardOnTheFly]
@@ -575,7 +575,7 @@ def get_plaquettes_and_masks(hilbert : HomogeneousHilbert, graph : AbstractGraph
     return (plaquettes, masks)
 
 def get_hf_orbitals(config : ConfigDict, hamiltonian : Hamiltonian, restricted: bool=True, fixed_magnetization: bool=True):
-    if MPIVars.comm.rank == 0:
+    if mpi_rank == 0:
         # Setup molecular system
         mol, h1, h2, norb, n_elec, nelec = setup_mol(config, hamiltonian)
 
@@ -626,7 +626,7 @@ def get_hf_orbitals(config : ConfigDict, hamiltonian : Hamiltonian, restricted: 
             orbitals[norb:, n_elec[0]:] = mo_coeff[1, :, :n_elec[1]]
     else:
         orbitals = None
-    orbitals = MPIVars.comm.bcast(orbitals, root=0)
+    orbitals = mpi_bcast(orbitals, root=0)
     return orbitals
 
 @dispatch
@@ -662,7 +662,7 @@ def setup_mol(config : ConfigDict, hamiltonian : FermiHubbardOnTheFly):
     return mol, h1, h2, norb, n_elec, nelec
 
 def get_hf_orbitals_from_file(config: ConfigDict, n_elec: Tuple[int, int], workdir: str=None, restricted: bool=True, fixed_magnetization: bool=True) -> Array:
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         if workdir is None:
             workdir = os.getcwd()
         hf_orbitals_path = os.path.join(workdir, 'hf_orbitals.npy')
@@ -696,7 +696,7 @@ def get_hf_orbitals_from_file(config: ConfigDict, n_elec: Tuple[int, int], workd
                 orbitals[norb:, nelec//2:] = hf_orbitals
     else:
         orbitals = None
-    orbitals = MPIVars.comm.bcast(orbitals, root=0)
+    orbitals = mpi_bcast(orbitals, root=0)
     return orbitals
 
 def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: bool=True, fixed_magnetization: bool=True):
@@ -732,7 +732,7 @@ def get_backflow_out_transformation(M: int, norb: int, nelec: int, restricted: b
     return out_trafo, np.prod(shape)
 
 def get_top_k_orbital_indices(config: ConfigDict, exchange_cutoff: int, workdir: str=None) -> Array:
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         # Load exchange matrix
         if workdir is None:
             workdir = os.getcwd()
@@ -755,5 +755,5 @@ def get_top_k_orbital_indices(config: ConfigDict, exchange_cutoff: int, workdir:
         top_k_orbital_indices = np.flip(np.argsort(np.abs(em), axis=1)[:, -exchange_cutoff:], axis=1)
     else:
         top_k_orbital_indices = None
-    top_k_orbital_indices = MPIVars.comm.bcast(top_k_orbital_indices, root=0)
+    top_k_orbital_indices = mpi_bcast(top_k_orbital_indices, root=0)
     return top_k_orbital_indices

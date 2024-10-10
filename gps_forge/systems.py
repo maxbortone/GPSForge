@@ -10,7 +10,8 @@ from GPSKet.operator.hamiltonian import FermiHubbardOnTheFly
 from pyscf import scf, gto, ao2mo, lo
 from pyscf.mcscf.casci import CASCI
 from pyscf.gto.basis import BasisNotFoundError
-from VMCutils import MPIVars
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import mpi_bcast
 
 
 def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
@@ -125,7 +126,7 @@ def get_molecular_system(config : ConfigDict, workdir : str=None, store_exchange
         Hamiltonian for the molecular system
     """
     # Setup Hilbert space
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         mol = build_molecule(config)
         spin = mol.spin
         n_elec = mol.nelec
@@ -144,14 +145,14 @@ def get_molecular_system(config : ConfigDict, workdir : str=None, store_exchange
         norb = None
         n_elec = None
         nelec = None
-    norb = MPIVars.comm.bcast(norb, root=0) # Number of molecular orbitals
-    n_elec = MPIVars.comm.bcast(n_elec, root=0) # Number of α and β electrons
-    nelec = MPIVars.comm.bcast(nelec, root=0) # Total number of electrons
+    norb = mpi_bcast(norb, root=0) # Number of molecular orbitals
+    n_elec = mpi_bcast(n_elec, root=0) # Number of α and β electrons
+    nelec = mpi_bcast(nelec, root=0) # Total number of electrons
 
     hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=n_elec)
 
     # Get hamiltonian elements
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         # Transform to a local orbital basis if wanted
         if workdir is None:
             workdir = os.getcwd()
@@ -227,8 +228,8 @@ def get_molecular_system(config : ConfigDict, workdir : str=None, store_exchange
     else:
         h1 = None
         h2 = None
-    h1 = MPIVars.comm.bcast(h1, root=0)
-    h2 = MPIVars.comm.bcast(h2, root=0)
+    h1 = mpi_bcast(h1, root=0)
+    h2 = mpi_bcast(h2, root=0)
 
     # Setup Hamiltonian
     if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:
@@ -249,7 +250,7 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         Hamiltonian for the molecular system
     """
     # Setup Hilbert space
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         # TODO: frozen core assumes a diatomic molecule of same atoms (e.g. Cr2); generalize this
         frozen_electrons = config.frozen_electrons
         mol = build_molecule(config)
@@ -270,14 +271,14 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
         norb = None
         n_elec = None
         nelec = None
-    norb = MPIVars.comm.bcast(norb, root=0) # Number of active molecular orbitals
-    n_elec = MPIVars.comm.bcast(n_elec, root=0) # Number of active α and β electrons
-    nelec = MPIVars.comm.bcast(nelec, root=0) # Total number of active electrons
+    norb = mpi_bcast(norb, root=0) # Number of active molecular orbitals
+    n_elec = mpi_bcast(n_elec, root=0) # Number of active α and β electrons
+    nelec = mpi_bcast(nelec, root=0) # Total number of active electrons
 
     hi = qk.hilbert.FermionicDiscreteHilbert(N=norb, n_elec=n_elec)
 
     # Get hamiltonian elements
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         # Load hamiltonian elements if they exist
         if workdir is None:
             workdir = os.getcwd()
@@ -352,8 +353,8 @@ def get_frozen_core_molecular_system(config : ConfigDict, workdir : str=None) ->
     else:
         h1 = None
         h2 = None
-    h1 = MPIVars.comm.bcast(h1, root=0)
-    h2 = MPIVars.comm.bcast(h2, root=0)
+    h1 = mpi_bcast(h1, root=0)
+    h2 = mpi_bcast(h2, root=0)
 
     # Setup Hamiltonian
     if config.get('pruning_threshold', None) is not None and config.pruning_threshold != 0.0:

@@ -17,7 +17,9 @@ from gps_forge.models import get_model
 from gps_forge.samplers import get_sampler
 from gps_forge.variational_states import get_variational_state
 from gps_forge.optimizers import get_optimizer
-from VMCutils import MPIVars, CSVLogger
+from VMCutils import CSVLogger
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import mpi_allgather
 
 
 def round_to_1_sig_fig(num):
@@ -37,7 +39,7 @@ def timeit(func, *args, repeat=1):
         end = timer()
         runtime = timedelta(seconds=end - start)
         # Get runtime from all MPI processes
-        runtimes.append(MPIVars.comm.allgather(runtime.total_seconds()))
+        runtimes.append(mpi_allgather(runtime.total_seconds()))
         runtime = np.mean(runtimes)
         error = np.std(runtimes)
     return result, runtime, error
@@ -72,7 +74,7 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
         vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 
     # Logger
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         fieldnames = ["Component", "Runtime", "Error"]
         logger = CSVLogger(os.path.join(workdir, "runtimes.csv"), fieldnames)
         total_steps = 6 if sr is not None else 5
@@ -84,64 +86,64 @@ def benchmark(config: ml_collections.ConfigDict, workdir: str):
     # ```
     # (see: https://github.com/google/jax/discussions/9716)
 
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         step = 1
         logging.info(f"[{step}/{total_steps}] Benchmarking compilation...")
     _, runtime_uncompiled, error_uncompiled = timeit(vmc.advance, 1)
     _, runtime_compiled, error_compiled = timeit(vmc.advance, 1)
     runtime = runtime_uncompiled - runtime_compiled
     error = np.max([error_uncompiled, error_compiled])
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logger(step, {"Component": "Compilation", "Runtime": runtime, "Error": error})
         logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 
     # Benchmark sampling
     vs.reset()
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         step += 1
         logging.info(f"[{step}/{total_steps}] Benchmarking sampling...")
     samples, runtime, error = timeit(vs.sample, repeat=config.repeat)
     samples = samples.reshape((-1, samples.shape[-1]))
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logger(step, {"Component": "Sampling", "Runtime": runtime, "Error": error})
         logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 
     # Benchmark amplitude evaluation
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         step += 1
         logging.info(f"[{step}/{total_steps}] Benchmarking amplitude evaluation...")
     # samples = jnp.squeeze(samples)
     _, runtime, error = timeit(vs.log_value, samples, repeat=config.repeat)
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logger(step, {"Component": "Amplitude", "Runtime": runtime, "Error": error})
         logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 
     # Benchmark energy and gradient evaluation
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         step += 1
         logging.info(f"[{step}/{total_steps}] Benchmarking energy and gradient evaluation...")
     (energy, grad), runtime, error = timeit(vs.expect_and_grad, ha, repeat=config.repeat)
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logger(step, {"Component": "Energy", "Runtime": runtime, "Error": error})
         logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 
     # Benchmark preconditioner evaluation
     if sr is not None:
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             step += 1
             logging.info(f"[{step}/{total_steps}] Benchmarking preconditioner evaluation...")
         _, runtime, error = timeit(sr, vs, grad, 1, repeat=config.repeat)
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             logger(step, {"Component": "Preconditioner", "Runtime": runtime, "Error": error})
             logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 
     # Benchmark optimization step
     vs.reset()
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         step += 1
         logging.info(f"[{step}/{total_steps}] Benchmarking optimization step...")
     _, runtime, error = timeit(vmc.advance, 1, repeat=config.repeat)
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logger(step, {"Component": "Optimization", "Runtime": runtime, "Error": error})
         logging.info(f"Done! This took {runtime:.2f}±{round_to_1_sig_fig(error)} seconds.")
 

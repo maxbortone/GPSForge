@@ -21,8 +21,9 @@ from gps_forge.models import get_model
 from gps_forge.samplers import get_sampler
 from gps_forge.variational_states import get_variational_state
 from gps_forge.optimizers import get_optimizer
-from VMCutils import MPIVars, Timer, CSVLogger
+from VMCutils import Timer, CSVLogger
 from VMCutils import restore_best_params, save_best_params
+from netket.utils.mpi import rank as mpi_rank
 from flax import core as fcore
 from flax import serialization
 from flax.training.checkpoints import save_checkpoint, restore_checkpoint
@@ -345,17 +346,17 @@ def fssc(config: ml_collections.ConfigDict, workdir: str):
     fssc = restore_checkpoint(checkpoints_dir, fssc)
     initial_step = fssc.step_count+1
     step = initial_step
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logging.info(f"Will start/continue training at initial_step={initial_step}")
 
     # Logger
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         fieldnames = list(nk.stats.Stats().to_dict().keys())+["Runtime"]
         logger = CSVLogger(os.path.join(workdir, "metrics.csv"), fieldnames)
 
     # Run training loop
     if initial_step < config.total_steps:
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             logging.info(f"Model has {vs.n_parameters} parameters")
             logging.info('Starting training loop; initial compile can take a while...')
             timer = Timer(config.total_steps)
@@ -367,25 +368,25 @@ def fssc(config: ml_collections.ConfigDict, workdir: str):
             fssc.advance()
 
             # Report compilation time
-            if MPIVars.rank == 0 and step == initial_step:
+            if mpi_rank == 0 and step == initial_step:
                 logging.info(f"First step took {time.time() - t0:.1f} seconds.")
 
             # Update timer
-            if MPIVars.rank == 0:
+            if mpi_rank == 0:
                 timer.update(step)
 
             # Log data
-            if MPIVars.rank == 0:
+            if mpi_rank == 0:
                 logger(step, {**fssc.energy.to_dict(), "Runtime": timer.runtime})
 
             # Save best energy params
-            if MPIVars.rank == 0 and fssc.energy.mean.real < best_energy:
+            if mpi_rank == 0 and fssc.energy.mean.real < best_energy:
                 best_energy = fssc.energy.mean.real
                 save_best_params(workdir, {"Energy": best_energy, "Parameters": fssc.state.parameters})
                 logging.info(f"Stored best parameters at step {step} with energy {fssc.energy}")
 
             # Report training metrics
-            if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
+            if mpi_rank == 0 and config.progress_every and step % config.progress_every == 0:
                 if hasattr(fssc, "_loss_grad"):
                     grad, _ = nk.jax.tree_ravel(fssc._loss_grad)
                     grad_norm = np.linalg.norm(grad)
@@ -398,7 +399,7 @@ def fssc(config: ml_collections.ConfigDict, workdir: str):
                             f"{timer}")
 
             # Store checkpoint
-            if MPIVars.rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == config.total_steps):
+            if mpi_rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == config.total_steps):
                 # TODO: migrate to new orbax API (see: https://flax.readthedocs.io/en/latest/guides/use_checkpointing.htm)
                 checkpoint_path = save_checkpoint(checkpoints_dir, fssc, step, keep_every_n_steps=config.checkpoint_every)
                 logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")

@@ -10,7 +10,8 @@ from gps_forge.datasets import get_dataset
 from gps_forge.systems import get_system
 from gps_forge.models import get_model
 from gps_forge.variational_states import get_variational_state
-from VMCutils import MPIVars, Timer, CSVLogger
+from VMCutils import Timer, CSVLogger
+from netket.utils.mpi import rank as mpi_rank
 from flax import serialization
 from flax.training.checkpoints import save_checkpoint, restore_checkpoint
 
@@ -78,16 +79,16 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
     arsf = restore_checkpoint(checkpoints_dir, arsf)
     initial_step = arsf.step_count + 1
     step = initial_step
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logging.info('Will start/continue training at initial_step=%d', initial_step)
 
     # Logger
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         fieldnames = ["Loss", "Runtime"]
         logger = CSVLogger(os.path.join(workdir, "metrics.csv"), fieldnames)
 
     # Run training loop
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logging.info('Starting training loop; initial compile can take a while...')
         timer = Timer(config.total_steps)
         t0 = time.time()
@@ -97,19 +98,19 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
         arsf.advance()
 
         # Report compilation time
-        if MPIVars.rank == 0 and step == initial_step:
+        if mpi_rank == 0 and step == initial_step:
             logging.info(f"First step took {time.time() - t0:.1f} seconds.")
         
         # Update timer
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             timer.update(step)
         
         # Log data
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             logger(step, {"Loss": arsf._loss_stats, "Runtime": timer.runtime})
 
         # Report training metrics
-        if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
+        if mpi_rank == 0 and config.progress_every and step % config.progress_every == 0:
             grad, _ = nk.jax.tree_ravel(arsf._loss_grad)
             grad_norm = np.linalg.norm(grad)
             done = step / total_steps
@@ -119,7 +120,7 @@ def ar_state_fitting(config: ml_collections.ConfigDict, workdir: str):
                          f"{timer}")
 
         # Store checkpoint
-        if MPIVars.rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == total_steps):
+        if mpi_rank == 0 and ((config.checkpoint_every and step % config.checkpoint_every == 0) or step == total_steps):
             checkpoint_path = save_checkpoint(workdir, arsf, step, keep_every_n_steps=config.checkpoint_every)
             logging.info(f"Stored checkpoint at step {step} to {checkpoint_path}")
 

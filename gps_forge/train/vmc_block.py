@@ -12,8 +12,9 @@ from netket.utils.types import Callable, PyTree, Array
 from gps_forge.systems import get_system
 from gps_forge.models import get_model
 from gps_forge.samplers import get_sampler
-from VMCutils import MPIVars, Timer, CSVLogger
+from VMCutils import Timer, CSVLogger
 from VMCutils import restore_best_params, save_best_params
+from netket.utils.mpi import rank as mpi_rank
 
 
 def get_apply_fun_block(vstate: nk.vqs.MCState) -> Callable:
@@ -110,12 +111,12 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
     update_block = get_update_block_fun(vs, vs_block, qgt, solver, config)
 
     # Logger
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         fieldnames = list(nk.stats.Stats().to_dict().keys())+["Runtime"]
         logger = CSVLogger(os.path.join(workdir, "metrics.csv"), fieldnames)
 
     # Run training loop
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         logging.info('Starting training loop; initial compile can take a while...')
         timer = Timer(config.total_steps)
         t0 = time.time()
@@ -152,26 +153,26 @@ def vmc_block(config: ml_collections.ConfigDict, workdir: str):
         vs.parameters = unravel_fun(model_params)
 
         # Report compilation time
-        if MPIVars.rank == 0 and step == initial_step:
+        if mpi_rank == 0 and step == initial_step:
             logging.info(f"First step took {time.time() - t0:.1f} seconds.")
 
         # Update timer
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             timer.update(step)
 
         # Log data
-        if MPIVars.rank == 0:
+        if mpi_rank == 0:
             logger(step, {**energy.to_dict(), "Runtime": timer.runtime})
 
         # Save best energy params
-        if MPIVars.rank == 0 and energy.mean.real < best_energy and energy.variance < best_variance:
+        if mpi_rank == 0 and energy.mean.real < best_energy and energy.variance < best_variance:
             best_energy = energy.mean.real
             best_variance = energy.variance
             save_best_params(workdir, {"Energy": best_energy, "Variance": best_variance, "Parameters": vs.parameters})
             logging.info(f"Stored best parameters at step {step} with energy {energy}")
 
         # Report training metrics
-        if MPIVars.rank == 0 and config.progress_every and step % config.progress_every == 0:
+        if mpi_rank == 0 and config.progress_every and step % config.progress_every == 0:
             grad_norm = np.linalg.norm(grad)
             done = step / total_steps
             logging.info(f"Step: {step}/{total_steps} {100*done:.1f}%, "  # pylint: disable=logging-format-interpolation

@@ -11,8 +11,6 @@
 # \end{align}
 # $$
 # where $Z_i = \sqrt{\sum_{x'}|\psi_i(x';x_{<i})|^2}$ is the normalization of the $i$-th local correlator.
-import numpy as np
-from VMCutils import MPIVars
 from gps_forge.configs import vmc
 
 

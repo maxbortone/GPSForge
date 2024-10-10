@@ -1,6 +1,7 @@
 import numpy as np
-from VMCutils import MPIVars
 from ml_collections import ConfigDict
+from netket.utils.mpi import rank as mpi_rank
+from netket.utils.mpi import mpi_bcast
 
 
 def get_config() -> ConfigDict:
@@ -33,11 +34,11 @@ def get_config() -> ConfigDict:
 
 def resolve(config: ConfigDict) -> ConfigDict:
     # Set random seed
-    if MPIVars.rank == 0:
+    if mpi_rank == 0:
         seed = np.random.randint(np.iinfo(np.uint32).max)
     else:
         seed = None
-    seed = MPIVars.comm.bcast(seed, root=0)
+    seed = mpi_bcast(seed, root=0)
     if config.get('variational_state', None) and config.variational_state_name != 'FullSumState' and config.variational_state.get('seed', None) is None:
         config.variational_state.seed = seed
 
