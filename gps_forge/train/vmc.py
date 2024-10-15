@@ -6,6 +6,7 @@ import ml_collections
 import numpy as np
 import netket as nk
 from netket.experimental.driver import VMC_SRt
+from GPSKet.driver import VMC_SRRMSProp
 import GPSKet as qk
 import jax.numpy as jnp
 from absl import logging
@@ -47,6 +48,26 @@ def deserialize_VMC(driver: nk.driver.VMC, state_dict: dict):
         new_driver.preconditioner._ema = serialization.from_state_dict(driver.preconditioner._ema, state_dict["preconditioner"])
     return new_driver
 
+def serialize_VMC_SRRMSProp(driver: VMC_SRRMSProp):
+    # TODO: serialize sampler state
+    state_dict = {
+        "variables": serialization.to_state_dict(driver.state.variables),
+        "optimizer": serialization.to_state_dict(driver._optimizer_state),
+        "ema": serialization.to_state_dict(driver.preconditioner._ema),
+        "step": driver._step_count
+    }
+    return state_dict
+
+def deserialize_VMC_SRRMSProp(driver: VMC_SRRMSProp, state_dict: dict):
+    import copy
+
+    new_driver = copy.copy(driver)
+    new_driver.state.variables = serialization.from_state_dict(driver.state.variables, state_dict["variables"])
+    new_driver._optimizer_state = serialization.from_state_dict(driver._optimizer_state, state_dict["optimizer"])
+    new_driver._step_count = serialization.from_state_dict(driver._step_count, state_dict["step"])
+    new_driver._ema = serialization.from_state_dict(driver._ema, state_dict["ema"])
+    return new_driver
+
 serialization.register_serialization_state(
     nk.driver.VMC,
     serialize_VMC,
@@ -61,6 +82,12 @@ serialization.register_serialization_state(
 
 serialization.register_serialization_state(
     VMC_SRt,
+    serialize_VMC,
+    deserialize_VMC
+)
+
+serialization.register_serialization_state(
+    VMC_SRRMSProp,
     serialize_VMC,
     deserialize_VMC
 )
@@ -91,6 +118,8 @@ def vmc(config: ml_collections.ConfigDict, workdir: str):
         vmc = qk.driver.minSRVMC(ha, op, variational_state=vs, mode=config.optimizer.mode, minSR_solver=solver)
     elif config.optimizer_name == 'kernelSR':
         vmc = VMC_SRt(ha, op, variational_state=vs, jacobian_mode=config.optimizer.mode, diag_shift=config.optimizer.diag_shift)
+    elif config.optimizer_name == 'SRRMSProp':
+        vmc = VMC_SRRMSProp(ha, op, variational_state=vs, diag_shift=config.optimizer.diag_shift, decay=config.optimizer.decay, eps=config.optimizer.eps, jacobian_mode=config.optimizer.mode)
     else:
         vmc = nk.driver.VMC(ha, op, variational_state=vs, preconditioner=sr)
 

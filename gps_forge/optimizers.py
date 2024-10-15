@@ -46,7 +46,7 @@ def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalS
     Returns:
         the optimizer with preconditioner, if specified
     """
-    if config.optimizer_name in ['Sgd', 'minSR', 'kernelSR']:
+    if config.optimizer_name in ['Sgd', 'minSR', 'kernelSR', 'SRRMSProp']:
         op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
         sr = None
     elif config.optimizer_name == 'Adam':
@@ -65,26 +65,6 @@ def get_optimizer(config : ConfigDict, variational_state : Optional[VariationalS
             diag_shift=config.optimizer.diag_shift,
             diag_scale=config.optimizer.diag_scale,
             mode=config.optimizer.mode)
-    elif config.optimizer_name == 'SRRMSProp':
-        op = nk.optimizer.Sgd(learning_rate=config.optimizer.learning_rate)
-        pars_struct = jax.tree_map(
-            lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype),
-            variational_state.parameters
-        )
-        solver = _SOLVERS[config.optimizer.solver]
-        if isinstance(config.optimizer.diag_shift, ConfigDict):
-            diag_shift = get_schedule(config.optimizer.diag_shift)
-        else:
-            diag_shift = config.optimizer.diag_shift
-        sr = qk.optimizer.SRRMSProp(
-            pars_struct,
-            qk.optimizer.qgt.QGTJacobianDenseRMSProp,
-            solver=solver,
-            diag_shift=diag_shift,
-            decay=config.optimizer.decay,
-            eps=config.optimizer.eps,
-            mode=config.optimizer.mode
-        )
     else:
         raise ValueError(f"Optimizer {config.optimizer_name} is not a valid class or is not supported yet.")
     return op, sr
