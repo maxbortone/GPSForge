@@ -51,7 +51,7 @@ def main(argv):
     config = resolve(config)
 
     if mpi_rank == 0:
-        add_file_logger(workdir, basename="evaluate_rdms")
+        add_file_logger(workdir, basename="evaluate_qgt_rank")
 
     logging.info(f"JAX local devices: {jax.local_devices()}")
     if mpi_rank == 0:
