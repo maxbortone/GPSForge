@@ -67,8 +67,9 @@ def main(argv):
     # Setup system and model
     ha = get_system(config, workdir=workdir)
     hi = ha.hilbert
+    g = ha.graph if hasattr(ha, 'graph') else None
     ma = get_model(config, hi, hamiltonian=ha, workdir=workdir)
-    sa = get_sampler(config, hi)
+    sa = get_sampler(config, hi, graph=g)
     vs = get_variational_state(config, ma, hilbert=hi, sampler=sa)
 
     # Load last checkpoint
