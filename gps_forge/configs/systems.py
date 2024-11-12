@@ -1,4 +1,6 @@
 import sys
+import os
+import h5py
 import math
 from ml_collections.config_dict import placeholder
 from ml_collections import ConfigDict
@@ -42,6 +44,16 @@ def diatomic(config):
     config.system.molecule = [
         (a, c) for a, c in zip(atoms, coords)
     ]
+    return config
+
+def small_molecule(config):
+    dataset_path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'small-molecules')
+    molecule_name = config.system.molecule_name
+    with h5py.File(os.path.join(dataset_path, f"{molecule_name}.hdf5"), 'r') as f:
+        atoms = map(lambda x: x.decode('utf-8'), f['geometry']['atoms'][()])
+        positions = map(lambda pos: tuple(float(x) for x in pos), f['geometry']['positions'][()])
+        geometry = list(zip(atoms, positions))
+    config.system.molecule = geometry
     return config
 
 def get_N2_config() -> ConfigDict:
@@ -170,6 +182,19 @@ def get_H2O_config() -> ConfigDict:
     config.basis = 'canonical'
     config.symmetry=False
     config.unit = 'Angstrom'
+    return config
+
+def get_small_molecule_config() -> ConfigDict:
+    config = ConfigDict()
+    config.pruning_threshold = placeholder(float)
+    config.basis_set = 'sto-3g'
+    config.basis = 'canonical'
+    config.symmetry=False
+    config.unit = 'Angstrom'
+    config.molecule_name = 'H2'
+    config.molecule = placeholder(list)
+    with config.ignore_type():
+        config.set_molecule = small_molecule
     return config
 
 def get_Hubbard1d_config() -> ConfigDict:

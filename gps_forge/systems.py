@@ -28,7 +28,7 @@ def get_system(config : ConfigDict, workdir : str=None) -> AbstractOperator:
     name = config.system_name
     if 'Heisenberg' in name or 'J1J2' in name:
         return get_Heisenberg_system(config.system)
-    elif name in ['Hchain', 'Hring', 'Hsheet', 'H2O', 'Cr2', 'Cr', 'N2']:
+    elif name in ['Hchain', 'Hring', 'Hsheet', 'H2O', 'Cr2', 'Cr', 'N2', 'small_molecule']:
         if config.system.get('frozen_electrons', None) is not None:
             return get_frozen_core_molecular_system(config.system, workdir=workdir)
         else:
